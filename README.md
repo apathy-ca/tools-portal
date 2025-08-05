@@ -1,0 +1,168 @@
+# DNS By Eye
+
+**Version 1.0.0**
+
+DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation chains from the root through TLDs to the authoritative nameservers, then renders interactive graphs of each layer and cross-reference diagrams. Features include:
+
+- **Multi-domain comparison**: Compare DNS delegation paths across multiple domains
+- **Response time monitoring**: Track DNS query performance with slow response indicators
+- **Interactive visualizations**: Graphviz-based PNG diagrams for each delegation layer
+- **Cross-reference analysis**: Detailed analysis of nameserver relationships and consistency
+- **Comprehensive API**: RESTful endpoints for programmatic access
+- **Export capabilities**: JSON and CSV export formats
+- **URL sharing**: Shareable URLs with query parameters for easy collaboration
+- **Multiple DNS servers**: Support for various public DNS resolvers
+- **Debug mode**: Detailed timing and performance analysis
+- **Rate limiting**: Built-in protection against abuse
+- **Modern UI**: Clean, responsive interface with syntax highlighting
+
+## Features
+
+### Core Functionality
+- Trace delegation chain with optional verbose glue records
+- Graphviz-based PNG diagrams for each delegation layer
+- Cross-reference graph of last-level nameservers
+- Response time tracking with slow query detection
+- Multi-domain comparison analysis
+
+### Technical Features
+- In-memory caching (Flask-Caching) with configurable TTL
+- Rate limiting (Flask-Limiter) to prevent abuse
+- Configurable timeouts for DNS resolution
+- Content Security Policy header for security hardening
+- Dockerfile and Gunicorn for production deployment
+- Comprehensive API documentation
+
+## Quickstart (Docker)
+
+```bash
+git clone https://github.com/jhenry/dns_by_eye.git
+cd dns_by_eye
+docker build -t dns_by_eye .
+docker run --rm -p 5000:5000 dns_by_eye
+```
+
+Open http://localhost:5000 in your browser.
+
+## Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - CACHE_TYPE=SimpleCache
+      - CACHE_DEFAULT_TIMEOUT=300
+      - DNS_TIMEOUT=2
+      - DNS_LIFETIME=4
+      - RATELIMIT_DEFAULT=100 per day
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+```
+
+## API Endpoints
+
+### Full Delegation Analysis
+```http
+POST /api/delegation
+Content-Type: application/json
+
+{
+  "domain": "example.com",
+  "verbose": true,
+  "dns_server": "system"
+}
+```
+
+### Simple Trace (No Visualizations)
+```http
+GET /api/trace/example.com?verbose=true&dns_server=8.8.8.8
+```
+
+### Multi-Domain Comparison
+```http
+POST /api/compare
+Content-Type: application/json
+
+{
+  "domains": ["example.com", "google.com"],
+  "verbose": false,
+  "dns_server": "1.1.1.1"
+}
+```
+
+### Export Data
+```http
+GET /api/export/example.com?format=json&verbose=true
+GET /api/export/example.com?format=csv&verbose=true
+```
+
+### Debug Analysis
+```http
+GET /api/debug/example.com?verbose=true&dns_server=8.8.8.8
+```
+
+### Utility Endpoints
+```http
+GET /api/nameservers/example.com?dns_server=1.1.1.1
+GET /api/dns-servers
+GET /api/health
+```
+
+## Response Format
+
+All endpoints return JSON with comprehensive data:
+
+- `trace`: Array of delegation steps with zones, nameservers, response times
+- `graph_urls`: URLs of generated visualization graphs
+- `chain`: Human-readable delegation chain
+- `cross_ref_results`: Nameserver consistency analysis
+- `cross_ref_graph_url`: Cross-reference visualization
+- `timing_info`: Performance metrics (debug mode)
+
+## Supported DNS Servers
+
+- **system**: System default DNS resolver
+- **8.8.8.8**: Google DNS
+- **1.1.1.1**: Cloudflare DNS
+- **9.9.9.9**: Quad9 DNS
+- **208.67.222.222**: OpenDNS
+
+## Configuration
+
+All settings can be overridden via environment variables or `config.py`:
+
+```python
+DNS_TIMEOUT = 3          # Individual query timeout
+DNS_LIFETIME = 6         # Total resolution timeout
+RATELIMIT_DEFAULT = "100 per day"
+CACHE_DEFAULT_TIMEOUT = 300
+```
+
+## Development
+
+### Local Development
+```bash
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+python -m flask run
+```
+
+### Testing
+```bash
+pytest tests/
+```
+
+## License
+
+This project is open source. See LICENSE file for details.
+
+## Acknowledgments
+
+Inspired by [dnsbajaj](https://www.zonecut.net/dns/) | Created with ChatGPT, Cline & Anthropic (Claude Sonnet)

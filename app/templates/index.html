@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:;">
+    <title>DNS By Eye</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .tree ul { list-style-type: none; }
+        .tree li { margin: 0.5em 0; }
+        .zone { font-weight: bold; }
+        .error { color: red; }
+        .chain { font-size: 1.1em; margin-bottom: 1em; }
+        footer { margin-top: 2em; font-size: 0.95em; }
+        
+        /* Custom styling for code blocks */
+        pre code {
+            border-radius: 6px;
+            padding: 16px;
+            display: block;
+            overflow-x: auto;
+        }
+        .hljs {
+            background: #f6f8fa;
+            border: 1px solid #d1d9e0;
+        }
+    </style>
+</head>
+<body>
+    <header style="display:flex; align-items:center; gap:10px; margin-bottom:1em;">
+        <img src="/static/logo.svg" alt="DNS By Eye Logo" style="height:40px; width:40px;">
+        <h1 style="margin:0;">DNS By Eye</h1>
+    </header>
+    <form id="domainForm" style="display:flex; align-items:center; gap:10px; margin-bottom:1em; max-width: 800px; flex-wrap: wrap;">
+        <textarea id="domainInput" placeholder="Enter domain(s) - one per line for comparison (e.g. example.com)" required style="flex-grow:1; min-width: 300px; min-height: 60px; resize: vertical; font-family: monospace;"></textarea>
+        <div style="display:flex; flex-direction:column; gap:2px;">
+            <label for="dnsServerSelect" style="font-size:0.9em; color:#666;">DNS Server:</label>
+            <select id="dnsServerSelect" style="min-width: 150px;">
+                <option value="system">System Default</option>
+            </select>
+        </div>
+        <button type="submit">Trace Delegation</button>
+    </form>
+    <div style="display:flex; align-items:center; gap:15px; margin-bottom:1em; flex-wrap: wrap;">
+        <label>
+            <input type="checkbox" id="verboseCheckbox">
+            Verbose output
+        </label>
+        <label>
+            <input type="checkbox" id="debugCheckbox">
+            Debug mode
+        </label>
+        <button type="button" id="docsToggle" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
+            📖 API Documentation
+        </button>
+        <button type="button" id="shareUrlBtn" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
+            🔗 Share URL
+        </button>
+    </div>
+    <div id="exportButtons" style="display:none; margin-bottom:1em; gap:10px;">
+        <button type="button" id="exportJsonBtn" style="background:#007bff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
+            📄 Export JSON
+        </button>
+        <button type="button" id="exportCsvBtn" style="background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
+            📊 Export CSV
+        </button>
+    </div>
+    <div id="documentation" style="display:none; margin-top:2em; padding:20px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px;">
+        <h2>API Documentation</h2>
+        <p>DNS By Eye provides several REST API endpoints for programmatic access:</p>
+        
+        <h3>Available Endpoints:</h3>
+        
+        <h4>1. Full Delegation Analysis</h4>
+        <pre><code class="language-http">POST /api/delegation
+Content-Type: application/json
+
+{
+  "domain": "example.com",
+  "verbose": false,
+  "dns_server": "system"
+}
+
+Returns: Full analysis with graphs and cross-reference data</code></pre>
+        
+        <h4>2. Simple Trace (No Visualizations)</h4>
+        <pre><code class="language-http">GET /api/trace/example.com?verbose=true&dns_server=8.8.8.8
+
+Returns: DNS delegation trace without generating graphs</code></pre>
+        
+        <h4>3. Get Nameservers</h4>
+        <pre><code class="language-http">GET /api/nameservers/example.com?dns_server=1.1.1.1
+
+Returns: List of nameservers for a domain</code></pre>
+        
+        <h4>4. Available DNS Servers</h4>
+        <pre><code class="language-http">GET /api/dns-servers
+
+Returns: List of available public DNS servers</code></pre>
+        
+        <h4>5. Health Check</h4>
+        <pre><code class="language-http">GET /api/health
+
+Returns: Service health status</code></pre>
+        
+        <h3>DNS Server Options:</h3>
+        <ul>
+            <li><code>system</code> - Use system default DNS resolver</li>
+            <li><code>8.8.8.8</code> - Google DNS</li>
+            <li><code>1.1.1.1</code> - Cloudflare DNS</li>
+            <li><code>9.9.9.9</code> - Quad9 DNS</li>
+            <li><code>208.67.222.222</code> - OpenDNS</li>
+        </ul>
+        
+        <h3>Example Usage:</h3>
+        
+        <h4>cURL Examples:</h4>
+        <pre><code class="language-bash"># Get delegation trace using Cloudflare DNS
+curl -X GET "http://localhost:5000/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
+
+# Full analysis with visualizations
+curl -X POST "http://localhost:5000/api/delegation" \
+     -H "Content-Type: application/json" \
+     -d '{"domain": "github.com", "verbose": true, "dns_server": "8.8.8.8"}'</code></pre>
+        
+        <h4>Python Example:</h4>
+        <pre><code class="language-python">import requests
+import json
+
+# Base URL for the API
+BASE_URL = "http://localhost:5000"
+
+def trace_domain(domain, dns_server="system", verbose=False):
+    """Get DNS delegation trace for a domain."""
+    url = f"{BASE_URL}/api/trace/{domain}"
+    params = {
+        "dns_server": dns_server,
+        "verbose": str(verbose).lower()
+    }
+    
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+        return None
+
+def full_analysis(domain, dns_server="system", verbose=False):
+    """Get full delegation analysis with visualizations."""
+    url = f"{BASE_URL}/api/delegation"
+    data = {
+        "domain": domain,
+        "dns_server": dns_server,
+        "verbose": verbose
+    }
+    
+    response = requests.post(url, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+        return None
+
+# Example usage
+if __name__ == "__main__":
+    domain = "example.com"
+    
+    # Simple trace
+    print("=== DNS Trace ===")
+    trace_data = trace_domain(domain, dns_server="8.8.8.8", verbose=True)
+    if trace_data:
+        for step in trace_data["trace"]:
+            print(f"{step['zone']}: {', '.join(step['nameservers'])}")
+    
+    # Full analysis
+    print("\n=== Full Analysis ===")
+    analysis = full_analysis(domain, dns_server="1.1.1.1", verbose=True)
+    if analysis:
+        print(f"Chain: {analysis['chain']}")
+        print(f"Cross-reference results: {len(analysis.get('cross_ref_results', {}))}")
+        print(f"Graph URLs: {len(analysis.get('graph_urls', []))}")
+</code></pre>
+        
+        <h3>Rate Limiting:</h3>
+        <p>All endpoints are rate-limited. Default limit is 100 requests per day.</p>
+    </div>
+
+    <div id="chain" class="chain"></div>
+    <div id="tree" class="tree"></div>
+    <div id="graphviz" style="margin-top:2em;"></div>
+    <hr style="margin-top: 2em; margin-bottom: 1em;">
+    <footer>
+        Inspired by <a href="https://www.zonecut.net/dns/" target="_blank">dnsbajaj</a> | Created by ChatGPT, Cline & Anthropic (Claude Sonnet)
+    </footer>
+    <script>
+        function renderTree(trace, verbose) {
+            if (!trace.length) return '';
+            let html = '<ul>';
+            for (let i = 0; i < trace.length; i++) {
+                const node = trace[i];
+                // Hide TLD layers (0 and 1) unless verbose is true
+                if (!verbose && (i === 0 || i === 1)) {
+                    continue;
+                }
+                html += '<li>';
+                html += `<span class="zone">${node.zone}</span>: `;
+                if (node.nameservers.length && node.nameservers[0].startsWith("Error:")) {
+                    html += `<span class="error">${node.nameservers[0]}</span>`;
+                } else {
+                    html += node.nameservers.join(', ');
+                }
+                html += '</li>';
+            }
+            html += '</ul>';
+            return html;
+        }
+
+        // Load DNS servers on page load
+        async function loadDnsServers() {
+            try {
+                const resp = await fetch('/api/dns-servers');
+                const servers = await resp.json();
+                const select = document.getElementById('dnsServerSelect');
+                
+                // Clear existing options except system default
+                select.innerHTML = '<option value="system">System Default</option>';
+                
+                // Add other servers
+                for (const [value, label] of Object.entries(servers)) {
+                    if (value !== 'system') {
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.textContent = label;
+                        select.appendChild(option);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load DNS servers:', err);
+            }
+        }
+
+        // Current query data for export
+        let currentQueryData = null;
+
+        function renderTree(trace, verbose) {
+            if (!trace.length) return '';
+            let html = '<ul>';
+            for (let i = 0; i < trace.length; i++) {
+                const node = trace[i];
+                // Hide TLD layers (0 and 1) unless verbose is true
+                if (!verbose && (i === 0 || i === 1)) {
+                    continue;
+                }
+                html += '<li>';
+                html += `<span class="zone">${node.zone}</span>: `;
+                if (node.nameservers.length && node.nameservers[0].startsWith("Error:")) {
+                    html += `<span class="error">${node.nameservers[0]}</span>`;
+                } else {
+                    html += node.nameservers.join(', ');
+                }
+                // Show response time with slow indicator
+                if (node.response_time !== undefined) {
+                    const timeClass = node.is_slow ? 'error' : '';
+                    const slowFlag = node.is_slow ? ' ⚠️ SLOW' : '';
+                    html += ` <small class="${timeClass}">(${node.response_time}ms${slowFlag})</small>`;
+                }
+                html += '</li>';
+            }
+            html += '</ul>';
+            return html;
+        }
+
+        function renderComparisonTree(comparisonResults) {
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+            
+            for (const [domain, result] of Object.entries(comparisonResults)) {
+                html += `<div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                            <h3>${domain}</h3>
+                            <p><strong>Chain:</strong> ${result.chain}</p>
+                            <p><strong>Total Response Time:</strong> ${result.total_response_time}ms</p>
+                            <p><strong>Slow Responses:</strong> ${result.slow_responses}</p>
+                            <p><strong>Nameserver Count:</strong> ${result.nameserver_count}</p>
+                            <div style="max-height: 200px; overflow-y: auto;">`;
+                
+                result.trace.forEach(node => {
+                    html += `<div style="margin: 5px 0; padding: 5px; background: #f8f9fa; border-radius: 4px;">
+                                <strong>${node.zone}:</strong> ${node.nameservers.join(', ')}`;
+                    if (node.response_time !== undefined) {
+                        const timeClass = node.is_slow ? 'color: red;' : '';
+                        const slowFlag = node.is_slow ? ' ⚠️' : '';
+                        html += ` <small style="${timeClass}">(${node.response_time}ms${slowFlag})</small>`;
+                    }
+                    html += `</div>`;
+                });
+                
+                html += `</div></div>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function updateUrlParams(domains, verbose, dns_server, debug) {
+            const url = new URL(window.location);
+            url.searchParams.set('domains', domains.join(','));
+            url.searchParams.set('verbose', verbose);
+            url.searchParams.set('dns_server', dns_server);
+            url.searchParams.set('debug', debug);
+            window.history.replaceState({}, '', url);
+        }
+
+        function loadFromUrlParams() {
+            const url = new URL(window.location);
+            const domainsParam = url.searchParams.get('domains');
+            const verbose = url.searchParams.get('verbose') === 'true';
+            const dns_server = url.searchParams.get('dns_server') || 'system';
+            const debug = url.searchParams.get('debug') === 'true';
+            
+            if (domainsParam) {
+                document.getElementById('domainInput').value = domainsParam.replace(/,/g, '\n');
+                document.getElementById('verboseCheckbox').checked = verbose;
+                document.getElementById('debugCheckbox').checked = debug;
+                document.getElementById('dnsServerSelect').value = dns_server;
+                
+                // Auto-submit if domains are in URL
+                document.getElementById('domainForm').dispatchEvent(new Event('submit'));
+            }
+        }
+
+        document.getElementById('domainForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const domainInput = document.getElementById('domainInput').value.trim();
+            const domains = domainInput.split('\n').map(d => d.trim()).filter(d => d);
+            const verbose = document.getElementById('verboseCheckbox').checked;
+            const debug = document.getElementById('debugCheckbox').checked;
+            const dns_server = document.getElementById('dnsServerSelect').value;
+            
+            if (domains.length === 0) {
+                alert('Please enter at least one domain');
+                return;
+            }
+            
+            document.getElementById('chain').innerHTML = '';
+            document.getElementById('tree').innerHTML = 'Loading...';
+            document.getElementById('graphviz').innerHTML = '';
+            document.getElementById('exportButtons').style.display = 'none';
+            
+            // Update URL for bookmarking
+            updateUrlParams(domains, verbose, dns_server, debug);
+            
+            let resp, data;
+            
+            if (domains.length === 1) {
+                // Single domain analysis
+                try {
+                    resp = await fetch('/api/delegation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ domain: domains[0], verbose, dns_server })
+                    });
+                    data = await resp.json();
+                } catch (err) {
+                    document.getElementById('chain').innerHTML = `<span class="error">Network error: ${err.message}</span>`;
+                    document.getElementById('tree').innerHTML = '';
+                    document.getElementById('graphviz').innerHTML = '';
+                    return;
+                }
+                
+                if (!resp.ok || data.error) {
+                    const msg = data.error || `HTTP error: ${resp.status}`;
+                    document.getElementById('chain').innerHTML = `<span class="error">${msg}</span>`;
+                    document.getElementById('tree').innerHTML = '';
+                    document.getElementById('graphviz').innerHTML = '';
+                    return;
+                }
+                
+                currentQueryData = { domain: domains[0], verbose, dns_server, debug };
+                document.getElementById('chain').innerHTML = data.chain ? `<b>Chain:</b> ${data.chain}` : '';
+                document.getElementById('tree').innerHTML = renderTree(data.trace, verbose);
+                document.getElementById('exportButtons').style.display = 'flex';
+                
+                if (data.graph_urls && data.graph_urls.length) {
+                    let html = '';
+                    data.graph_urls.forEach((url, idx) => {
+                        const layerName = data.trace && data.trace[idx] ? data.trace[idx].zone : `Layer ${idx + 1}`;
+                        const isRoot = layerName === '.';
+                        
+                        html += `<div style="margin-bottom: 2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                                    <h3>${isRoot ? 'Root Servers (.)' : layerName}</h3>
+                                    <div style="text-align: center;">
+                                        <img src="${url}" alt="DNS Delegation Graph ${layerName}" style="max-width:100%; height: auto;">
+                                    </div>`;
+                        
+                        // Add verbose info section (hidden by default, controlled by checkbox)
+                        if (data.trace && data.trace[idx] && data.trace[idx].verbose) {
+                            html += `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top: 15px;">
+                                        <details>
+                                            <summary style="cursor: pointer; font-weight: bold; color: #666;">Technical Details</summary>
+                                            <pre style="background:#f0f0f0; padding:10px; white-space: pre-wrap; margin-top: 10px; border-radius: 4px;">${data.trace[idx].verbose}</pre>
+                                        </details>
+                                     </div>`;
+                        }
+                        html += `</div>`;
+                    });
+                    
+                    // Always append cross-reference graph if available
+                    if (data.cross_ref_graph_url) {
+                        html += `<div style="margin-top:2em; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                                    <h3>Last Level Cross-Reference Graph</h3>
+                                    <img src="${data.cross_ref_graph_url}" alt="Cross-Reference Graph" style="max-width:100%; height: auto;"/>
+                                 </div>`;
+                    }
+                    
+                    // Show cross reference results if any (below the graph)
+                    if (data.cross_ref_results && Object.keys(data.cross_ref_results).length > 0) {
+                        html += `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top:2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                                    <details>
+                                        <summary style="cursor: pointer; font-weight: bold; color: #666;">Last Level Nameserver Cross-Reference Results</summary>
+                                        <ul style="text-align: left; margin-top: 10px;">`;
+                        for (const [ns, info] of Object.entries(data.cross_ref_results)) {
+                            let refs = info.references || [];
+                            let aRecords = info.A || [];
+                            let aaaaRecords = info.AAAA || [];
+                            html += `<li style="margin: 10px 0;"><b>${ns}</b>:<br>
+                                     <span style="margin-left: 15px;">References: ${Array.isArray(refs) ? refs.join(', ') : refs}</span><br>
+                                     <span style="margin-left: 15px;">A: ${aRecords.join(', ')}</span><br>
+                                     <span style="margin-left: 15px;">AAAA: ${aaaaRecords.join(', ')}</span></li>`;
+                        }
+                        html += `</ul></details></div>`;
+                    }
+                    
+                    document.getElementById('graphviz').innerHTML = html;
+                }
+            } else {
+                // Multi-domain comparison
+                try {
+                    resp = await fetch('/api/compare', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ domains, verbose, dns_server, debug })
+                    });
+                    data = await resp.json();
+                } catch (err) {
+                    document.getElementById('chain').innerHTML = `<span class="error">Network error: ${err.message}</span>`;
+                    document.getElementById('tree').innerHTML = '';
+                    document.getElementById('graphviz').innerHTML = '';
+                    return;
+                }
+                
+                if (!resp.ok || data.error) {
+                    const msg = data.error || `HTTP error: ${resp.status}`;
+                    document.getElementById('chain').innerHTML = `<span class="error">${msg}</span>`;
+                    document.getElementById('tree').innerHTML = '';
+                    document.getElementById('graphviz').innerHTML = '';
+                    return;
+                }
+                
+                currentQueryData = { domains, verbose, dns_server, debug, comparison: true };
+                document.getElementById('chain').innerHTML = `<b>Domain Comparison:</b> ${domains.length} domains analyzed`;
+                document.getElementById('tree').innerHTML = renderComparisonTree(data.comparison_results);
+                document.getElementById('exportButtons').style.display = 'flex';
+                document.getElementById('graphviz').innerHTML = '';
+            }
+        });
+
+        // Add event listener to toggle verbose sections when checkbox changes
+        document.getElementById('verboseCheckbox').addEventListener('change', function() {
+            const verboseSections = document.querySelectorAll('.verbose-section');
+            const isChecked = this.checked;
+            verboseSections.forEach(section => {
+                section.style.display = isChecked ? 'block' : 'none';
+            });
+        });
+
+        // Toggle documentation visibility
+        document.getElementById('docsToggle').addEventListener('click', function() {
+            const docs = document.getElementById('documentation');
+            const isVisible = docs.style.display !== 'none';
+            docs.style.display = isVisible ? 'none' : 'block';
+            this.textContent = isVisible ? '📖 API Documentation' : '❌ Hide Documentation';
+            
+            // Apply syntax highlighting when documentation is shown
+            if (!isVisible) {
+                setTimeout(() => {
+                    if (window.hljs) {
+                        document.querySelectorAll('#documentation pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                }, 50);
+            }
+        });
+
+        // Share URL functionality
+        document.getElementById('shareUrlBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                const btn = this;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.background = '#28a745';
+                btn.style.color = 'white';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = 'none';
+                    btn.style.color = 'inherit';
+                }, 2000);
+            }).catch(() => {
+                alert('Unable to copy URL to clipboard');
+            });
+        });
+
+        // Export functionality
+        document.getElementById('exportJsonBtn').addEventListener('click', function() {
+            if (!currentQueryData) {
+                alert('No data to export. Please run a query first.');
+                return;
+            }
+            
+            if (currentQueryData.comparison) {
+                // For comparison, export as JSON isn't supported via single endpoint
+                alert('JSON export for comparison not yet implemented. Use individual domain exports.');
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                format: 'json',
+                verbose: currentQueryData.verbose,
+                dns_server: currentQueryData.dns_server,
+                debug: currentQueryData.debug
+            });
+            
+            window.open(`/api/export/${currentQueryData.domain}?${params}`, '_blank');
+        });
+
+        document.getElementById('exportCsvBtn').addEventListener('click', function() {
+            if (!currentQueryData) {
+                alert('No data to export. Please run a query first.');
+                return;
+            }
+            
+            if (currentQueryData.comparison) {
+                alert('CSV export for comparison not yet implemented. Use individual domain exports.');
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                format: 'csv',
+                verbose: currentQueryData.verbose,
+                dns_server: currentQueryData.dns_server,
+                debug: currentQueryData.debug
+            });
+            
+            window.open(`/api/export/${currentQueryData.domain}?${params}`, '_blank');
+        });
+
+        // Add copy-to-clipboard functionality for code examples
+        function addCopyButtons() {
+            const codeBlocks = document.querySelectorAll('#documentation pre code');
+            codeBlocks.forEach((codeBlock, index) => {
+                const pre = codeBlock.parentElement;
+                if (pre.querySelector('.copy-btn')) return; // Already has copy button
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = '📋 Copy';
+                copyBtn.style.cssText = `
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.8em;
+                    z-index: 10;
+                `;
+                
+                pre.style.position = 'relative';
+                pre.appendChild(copyBtn);
+                
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                        copyBtn.textContent = '✓ Copied';
+                        copyBtn.style.background = '#28a745';
+                        setTimeout(() => {
+                            copyBtn.textContent = '📋 Copy';
+                            copyBtn.style.background = '#007bff';
+                        }, 2000);
+                    }).catch(() => {
+                        alert('Unable to copy to clipboard');
+                    });
+                });
+            });
+        }
+
+        // Enhanced documentation toggle with copy buttons
+        document.getElementById('docsToggle').addEventListener('click', function() {
+            const docs = document.getElementById('documentation');
+            const isVisible = docs.style.display !== 'none';
+            docs.style.display = isVisible ? 'none' : 'block';
+            this.textContent = isVisible ? '📖 API Documentation' : '❌ Hide Documentation';
+            
+            // Apply syntax highlighting when documentation is shown
+            if (!isVisible) {
+                setTimeout(() => {
+                    if (window.hljs) {
+                        document.querySelectorAll('#documentation pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                    addCopyButtons();
+                }, 50);
+            }
+        });
+
+        // Load DNS servers when page loads
+        loadDnsServers();
+        
+        // Load from URL parameters on page load
+        window.addEventListener('load', loadFromUrlParams);
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+        // Initialize highlight.js when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.hljs) {
+                hljs.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
