@@ -84,6 +84,9 @@ docker compose -f docker-compose.ssl.yaml logs -f         # View logs (Ctrl+C to
 docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates  # Check certificates
 docker compose -f docker-compose.ssl.yaml down            # Stop all services
 docker compose -f docker-compose.ssl.yaml restart         # Restart all services
+
+# Troubleshooting SSL issues:
+./troubleshoot-ssl.sh your-domain.com                     # Comprehensive SSL diagnostics
 ```
 
 The SSL setup includes:

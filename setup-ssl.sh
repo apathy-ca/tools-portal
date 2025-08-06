@@ -73,21 +73,46 @@ sleep 10
 
 # Generate SSL certificate
 echo "Generating SSL certificate..."
+echo "Testing domain accessibility..."
+curl -I http://$DOMAIN/.well-known/acme-challenge/test || echo "Warning: Domain may not be accessible"
+
 if [ -n "$EMAIL" ]; then
+    echo "Requesting certificate with email: $EMAIL"
     docker compose -f docker-compose.ssl.yaml run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email $EMAIL \
         --agree-tos \
         --no-eff-email \
+        --force-renewal \
+        --verbose \
         -d $DOMAIN
 else
+    echo "Requesting certificate without email (not recommended)"
     docker compose -f docker-compose.ssl.yaml run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --register-unsafely-without-email \
         --agree-tos \
+        --force-renewal \
+        --verbose \
         -d $DOMAIN
+fi
+
+# Check if certificate was created
+echo "Checking if certificate was generated..."
+if docker compose -f docker-compose.ssl.yaml run --rm certbot ls /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
+    echo -e "${GREEN}Certificate generated successfully!${NC}"
+else
+    echo -e "${RED}Certificate generation failed!${NC}"
+    echo "Checking certbot logs..."
+    docker compose -f docker-compose.ssl.yaml logs certbot
+    echo -e "${RED}Please check that:${NC}"
+    echo "1. Domain $DOMAIN points to this server"
+    echo "2. Port 80 is accessible from the internet"
+    echo "3. No firewall is blocking the connection"
+    echo "4. Try running: curl -I http://$DOMAIN"
+    exit 1
 fi
 
 # Restore the full nginx config with SSL
