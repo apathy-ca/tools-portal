@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y graphviz && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt config.py .
+COPY requirements.txt config.py ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code

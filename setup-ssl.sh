@@ -69,12 +69,20 @@ docker compose -f docker-compose.ssl.yaml up -d web redis nginx
 
 # Wait for services to be ready
 echo "Waiting for services to start..."
-sleep 10
+sleep 15
+
+# Create a test file for ACME challenge verification
+echo "Creating test file for ACME challenge verification..."
+docker compose -f docker-compose.ssl.yaml exec nginx mkdir -p /var/www/certbot/.well-known/acme-challenge
+docker compose -f docker-compose.ssl.yaml exec nginx sh -c 'echo "test-challenge-file" > /var/www/certbot/.well-known/acme-challenge/test'
 
 # Generate SSL certificate
 echo "Generating SSL certificate..."
 echo "Testing domain accessibility..."
-curl -I http://$DOMAIN/.well-known/acme-challenge/test || echo "Warning: Domain may not be accessible"
+echo "Testing basic HTTP access..."
+curl -I http://$DOMAIN/ || echo "Warning: Basic HTTP access failed"
+echo "Testing ACME challenge path..."
+curl -I http://$DOMAIN/.well-known/acme-challenge/test || echo "Warning: ACME challenge path not accessible"
 
 # Remove any existing certificates first
 echo "Cleaning up any existing certificates..."
