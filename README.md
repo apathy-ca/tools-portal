@@ -50,24 +50,26 @@ Open http://localhost:5000 in your browser.
 
 ## Docker Compose
 
-```yaml
-version: '3.8'
-services:
-  web:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      - CACHE_TYPE=SimpleCache
-      - CACHE_DEFAULT_TIMEOUT=300
-      - DNS_TIMEOUT=2
-      - DNS_LIFETIME=4
-      - RATELIMIT_DEFAULT=100 per day
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
+```bash
+# Start the application with Redis
+docker-compose up
+
+# Start in detached mode
+docker-compose up -d
+
+# Rebuild images after code changes
+docker-compose up --build
+
+# Stop the application
+docker-compose down
 ```
+
+The `docker-compose.yaml` file includes:
+- **Web service**: DNS By Eye application with environment variables
+- **Redis service**: For caching with persistent data storage
+- **Automatic restarts**: Services restart unless manually stopped
+
+**Important**: After making code changes, use `docker-compose up --build` to rebuild the Docker image with your latest changes.
 
 ## API Endpoints
 
