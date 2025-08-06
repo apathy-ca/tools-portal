@@ -50,6 +50,8 @@ Open http://localhost:5000 in your browser.
 
 ## Docker Compose
 
+### Basic Setup (HTTP only)
+
 ```bash
 # Start the application with Redis
 docker-compose up
@@ -64,12 +66,36 @@ docker-compose up --build
 docker-compose down
 ```
 
-The `docker-compose.yaml` file includes:
-- **Web service**: DNS By Eye application with environment variables
-- **Redis service**: For caching with persistent data storage
-- **Automatic restarts**: Services restart unless manually stopped
+### SSL Setup with Let's Encrypt
 
-**Important**: After making code changes, use `docker-compose up --build` to rebuild the Docker image with your latest changes.
+For production deployment with SSL certificates:
+
+```bash
+# Set up SSL certificates (replace with your domain and email)
+./setup-ssl.sh your-domain.com admin@your-domain.com
+
+# Or without email (not recommended for production)
+./setup-ssl.sh your-domain.com
+
+# Check certificate status
+docker-compose -f docker-compose.ssl.yaml exec certbot certbot certificates
+
+# View logs
+docker-compose -f docker-compose.ssl.yaml logs nginx
+docker-compose -f docker-compose.ssl.yaml logs certbot
+```
+
+The SSL setup includes:
+- **Nginx reverse proxy** with SSL termination
+- **Let's Encrypt certificates** with automatic renewal
+- **Security headers** and HTTPS redirects
+- **Rate limiting** for API protection
+- **Gzip compression** for better performance
+
+**Important**: 
+- After making code changes, use `docker-compose up --build` to rebuild the Docker image
+- For SSL setup, ensure your domain points to your server before running the setup script
+- Certificates are automatically renewed every 12 hours
 
 ## API Endpoints
 

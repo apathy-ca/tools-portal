@@ -12,6 +12,8 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
+    volumes:
+      - ./app/static:/app/app/static
 
   redis:
     image: redis:alpine

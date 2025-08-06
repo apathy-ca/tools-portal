@@ -14,7 +14,7 @@ from flask_limiter.util import get_remote_address
 from flask_compress import Compress
 from config import Config
 
-app = Flask(__name__, static_folder="static")
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
 
 # Initialize compression
