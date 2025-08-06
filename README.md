@@ -33,10 +33,14 @@ DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation 
 - Dockerfile and Gunicorn for production deployment
 - Comprehensive API documentation
 
+## Live Demo
+
+Try DNS By Eye online at: **[http://tools.apathy.ca:5000](http://tools.apathy.ca:5000)**
+
 ## Quickstart (Docker)
 
 ```bash
-git clone https://github.com/jhenry/dns_by_eye.git
+git clone https://github.com/apathy-ca/dns_by_eye.git
 cd dns_by_eye
 docker build -t dns_by_eye .
 docker run --rm -p 5000:5000 dns_by_eye
@@ -162,6 +166,11 @@ pytest tests/
 ## License
 
 This project is open source. See LICENSE file for details.
+
+## Links
+
+- **Live Demo**: [http://tools.apathy.ca:5000](http://tools.apathy.ca:5000)
+- **GitHub Repository**: [https://github.com/apathy-ca/dns_by_eye](https://github.com/apathy-ca/dns_by_eye)
 
 ## Acknowledgments
 

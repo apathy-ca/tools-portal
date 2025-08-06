@@ -29,7 +29,7 @@
 </head>
 <body>
     <header style="display:flex; align-items:center; gap:10px; margin-bottom:1em;">
-        <img src="/static/logo.svg" alt="DNS By Eye Logo" style="height:40px; width:40px;">
+        <img src="{{ url_for('static', filename='logo.svg') }}" alt="DNS By Eye Logo" style="height:40px; width:40px;">
         <h1 style="margin:0;">DNS By Eye</h1>
     </header>
     <form id="domainForm" style="display:flex; align-items:center; gap:10px; margin-bottom:1em; max-width: 800px; flex-wrap: wrap;">
@@ -116,11 +116,19 @@ Returns: Service health status</code></pre>
         <h3>Example Usage:</h3>
         
         <h4>cURL Examples:</h4>
-        <pre><code class="language-bash"># Get delegation trace using Cloudflare DNS
+        <pre><code class="language-bash"># Get delegation trace using Cloudflare DNS (local)
 curl -X GET "http://localhost:5000/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
 
-# Full analysis with visualizations
+# Get delegation trace using live demo instance
+curl -X GET "http://tools.apathy.ca:5000/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
+
+# Full analysis with visualizations (local)
 curl -X POST "http://localhost:5000/api/delegation" \
+     -H "Content-Type: application/json" \
+     -d '{"domain": "github.com", "verbose": true, "dns_server": "8.8.8.8"}'
+
+# Full analysis with visualizations (live demo)
+curl -X POST "http://tools.apathy.ca:5000/api/delegation" \
      -H "Content-Type: application/json" \
      -d '{"domain": "github.com", "verbose": true, "dns_server": "8.8.8.8"}'</code></pre>
         
@@ -128,8 +136,9 @@ curl -X POST "http://localhost:5000/api/delegation" \
         <pre><code class="language-python">import requests
 import json
 
-# Base URL for the API
-BASE_URL = "http://localhost:5000"
+# Base URL for the API (use live demo or local instance)
+BASE_URL = "http://tools.apathy.ca:5000"  # Live demo
+# BASE_URL = "http://localhost:5000"      # Local instance
 
 def trace_domain(domain, dns_server="system", verbose=False):
     """Get DNS delegation trace for a domain."""
@@ -191,7 +200,15 @@ if __name__ == "__main__":
     <div id="graphviz" style="margin-top:2em;"></div>
     <hr style="margin-top: 2em; margin-bottom: 1em;">
     <footer>
-        Inspired by <a href="https://www.zonecut.net/dns/" target="_blank">dnsbajaj</a> | Created by ChatGPT, Cline & Anthropic (Claude Sonnet)
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; text-align: center;">
+            <span>Inspired by <a href="https://www.zonecut.net/dns/" target="_blank">dnsbajaj</a></span>
+            <span>|</span>
+            <span>Created by ChatGPT, Cline & Anthropic (Claude Sonnet)</span>
+            <span>|</span>
+            <span><a href="http://tools.apathy.ca:5000" target="_blank">🌐 Live Demo</a></span>
+            <span>|</span>
+            <span><a href="https://github.com/apathy-ca/dns_by_eye" target="_blank">📂 GitHub Repository</a></span>
+        </div>
     </footer>
     <script>
         function renderTree(trace, verbose) {
