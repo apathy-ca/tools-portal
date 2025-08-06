@@ -207,12 +207,12 @@ def build_layer_graph(zone, ns_list, parent_ns_list=None, verbose_info=None, ver
                 if ns in referenced_ns:
                     c.node(ns_nodes[ns])
 
-    # Save to static/graph_layer_{index}.png
-    static_dir = os.path.join(app.root_path, "static")
+    # Save to static/generated/graph_layer_{index}.png
+    static_dir = os.path.join(app.root_path, "static", "generated")
     os.makedirs(static_dir, exist_ok=True)
     graph_path = os.path.join(static_dir, f"{prefix}_graph_layer_{index}")
     dot.render(graph_path, cleanup=True)
-    return url_for('static', filename=f"{prefix}_graph_layer_{index}.png")
+    return url_for('static', filename=f"generated/{prefix}_graph_layer_{index}.png")
 
 def build_all_layer_graphs(trace, domain, verbose=False, prefix=None):
     """
@@ -326,12 +326,12 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
                 # Create a self-loop
                 dot.edge(ns, ns, color='green', style='solid', label='self-ref')
 
-    # Save to static with unique prefix to avoid collisions
-    static_dir = os.path.join(app.root_path, "static")
+    # Save to static/generated with unique prefix to avoid collisions
+    static_dir = os.path.join(app.root_path, "static", "generated")
     os.makedirs(static_dir, exist_ok=True)
     graph_path = os.path.join(static_dir, f"{prefix}_cross_ref_graph")
     dot.render(graph_path, cleanup=True)
-    return url_for('static', filename=f'{prefix}_cross_ref_graph.png')
+    return url_for('static', filename=f'generated/{prefix}_cross_ref_graph.png')
 
 @app.route('/', methods=['GET'])
 def index():

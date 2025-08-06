@@ -16,7 +16,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 # Create non-root user and set ownership
-RUN useradd --create-home --shell /bin/bash appuser && chown -R appuser /app
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser /app && \
+    chmod -R 755 /app/app/static && \
+    mkdir -p /app/app/static/generated && \
+    chown -R appuser:appuser /app/app/static/generated && \
+    chmod -R 775 /app/app/static/generated
 
 # Expose Flask port
 EXPOSE 5000

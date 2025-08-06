@@ -14,6 +14,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./app/static:/app/app/static
+      - generated_files:/app/app/static/generated
 
   redis:
     image: redis:alpine
@@ -48,5 +49,6 @@ services:
 
 volumes:
   redis_data:
+  generated_files:
   certbot_conf:
   certbot_www:
