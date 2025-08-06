@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - CACHE_TYPE=SimpleCache
+      - CACHE_DEFAULT_TIMEOUT=300
+      - DNS_TIMEOUT=2
+      - DNS_LIFETIME=4
+      - RATELIMIT_DEFAULT=100 per day
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
