@@ -25,12 +25,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest flake8 flask-limiter flask-caching
+          pip install pytest flake8
 
       - name: Lint with flake8
         run: |
-          flake8 .
+          flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 app/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
       - name: Run tests
         run: |
-          pytest
+          python -m pytest tests/ -v --tb=short

@@ -76,6 +76,10 @@ echo "Generating SSL certificate..."
 echo "Testing domain accessibility..."
 curl -I http://$DOMAIN/.well-known/acme-challenge/test || echo "Warning: Domain may not be accessible"
 
+# Remove any existing certificates first
+echo "Cleaning up any existing certificates..."
+docker compose -f docker-compose.ssl.yaml run --rm certbot delete --cert-name $DOMAIN --non-interactive || true
+
 if [ -n "$EMAIL" ]; then
     echo "Requesting certificate with email: $EMAIL"
     docker compose -f docker-compose.ssl.yaml run --rm certbot certonly \
@@ -84,8 +88,9 @@ if [ -n "$EMAIL" ]; then
         --email $EMAIL \
         --agree-tos \
         --no-eff-email \
-        --force-renewal \
+        --non-interactive \
         --verbose \
+        --expand \
         -d $DOMAIN
 else
     echo "Requesting certificate without email (not recommended)"
@@ -94,8 +99,9 @@ else
         --webroot-path=/var/www/certbot \
         --register-unsafely-without-email \
         --agree-tos \
-        --force-renewal \
+        --non-interactive \
         --verbose \
+        --expand \
         -d $DOMAIN
 fi
 
