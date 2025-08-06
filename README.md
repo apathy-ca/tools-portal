@@ -72,17 +72,18 @@ For production deployment with SSL certificates:
 
 ```bash
 # Set up SSL certificates (replace with your domain and email)
+# This runs as a daemon - you can close the terminal after setup
 ./setup-ssl.sh your-domain.com admin@your-domain.com
 
 # Or without email (not recommended for production)
 ./setup-ssl.sh your-domain.com
 
-# Check certificate status
-docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates
-
-# View logs
-docker compose -f docker-compose.ssl.yaml logs nginx
-docker compose -f docker-compose.ssl.yaml logs certbot
+# Management commands (after setup):
+docker compose -f docker-compose.ssl.yaml ps              # Check status
+docker compose -f docker-compose.ssl.yaml logs -f         # View logs (Ctrl+C to exit)
+docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates  # Check certificates
+docker compose -f docker-compose.ssl.yaml down            # Stop all services
+docker compose -f docker-compose.ssl.yaml restart         # Restart all services
 ```
 
 The SSL setup includes:
