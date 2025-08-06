@@ -337,6 +337,11 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
 def index():
     return render_template('index.html')
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files explicitly to ensure they work in all environments."""
+    return send_from_directory(app.static_folder, filename)
+
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_DEFAULT)
 def api_delegation():
