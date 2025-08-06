@@ -65,7 +65,7 @@ EOF
 # Start services without SSL first
 echo "Starting services for certificate generation..."
 cp nginx-temp.conf nginx.conf
-docker-compose -f docker-compose.ssl.yaml up -d web redis nginx
+docker compose -f docker-compose.ssl.yaml up -d web redis nginx
 
 # Wait for services to be ready
 echo "Waiting for services to start..."
@@ -74,7 +74,7 @@ sleep 10
 # Generate SSL certificate
 echo "Generating SSL certificate..."
 if [ -n "$EMAIL" ]; then
-    docker-compose -f docker-compose.ssl.yaml run --rm certbot certonly \
+    docker compose -f docker-compose.ssl.yaml run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email $EMAIL \
@@ -82,7 +82,7 @@ if [ -n "$EMAIL" ]; then
         --no-eff-email \
         -d $DOMAIN
 else
-    docker-compose -f docker-compose.ssl.yaml run --rm certbot certonly \
+    docker compose -f docker-compose.ssl.yaml run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --register-unsafely-without-email \
@@ -201,11 +201,11 @@ EOF
 
 # Restart nginx with SSL configuration
 echo "Restarting nginx with SSL configuration..."
-docker-compose -f docker-compose.ssl.yaml restart nginx
+docker compose -f docker-compose.ssl.yaml restart nginx
 
 # Start certbot for automatic renewal
 echo "Starting certbot for automatic certificate renewal..."
-docker-compose -f docker-compose.ssl.yaml up -d certbot
+docker compose -f docker-compose.ssl.yaml up -d certbot
 
 # Clean up
 rm -f nginx-temp.conf
@@ -216,4 +216,4 @@ echo -e "${GREEN}https://$DOMAIN${NC}"
 echo ""
 echo "Certificate will be automatically renewed every 12 hours."
 echo "To check certificate status:"
-echo "docker-compose -f docker-compose.ssl.yaml exec certbot certbot certificates"
+echo "docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates"

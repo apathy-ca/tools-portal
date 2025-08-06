@@ -54,16 +54,16 @@ Open http://localhost:5000 in your browser.
 
 ```bash
 # Start the application with Redis
-docker-compose up
+docker compose up
 
 # Start in detached mode
-docker-compose up -d
+docker compose up -d
 
 # Rebuild images after code changes
-docker-compose up --build
+docker compose up --build
 
 # Stop the application
-docker-compose down
+docker compose down
 ```
 
 ### SSL Setup with Let's Encrypt
@@ -78,11 +78,11 @@ For production deployment with SSL certificates:
 ./setup-ssl.sh your-domain.com
 
 # Check certificate status
-docker-compose -f docker-compose.ssl.yaml exec certbot certbot certificates
+docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates
 
 # View logs
-docker-compose -f docker-compose.ssl.yaml logs nginx
-docker-compose -f docker-compose.ssl.yaml logs certbot
+docker compose -f docker-compose.ssl.yaml logs nginx
+docker compose -f docker-compose.ssl.yaml logs certbot
 ```
 
 The SSL setup includes:
@@ -93,7 +93,7 @@ The SSL setup includes:
 - **Gzip compression** for better performance
 
 **Important**: 
-- After making code changes, use `docker-compose up --build` to rebuild the Docker image
+- After making code changes, use `docker compose up --build` to rebuild the Docker image
 - For SSL setup, ensure your domain points to your server before running the setup script
 - Certificates are automatically renewed every 12 hours
 
