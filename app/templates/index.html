@@ -205,10 +205,15 @@ if __name__ == "__main__":
     <hr style="margin-top: 2em; margin-bottom: 1em;">
     
     <!-- Documentation moved to bottom -->
-    <div style="margin-bottom: 1em;">
+    <div style="margin-bottom: 1em; display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
         <button type="button" id="docsToggle" style="background:none; border:1px solid #ccc; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:0.9em;">
             📖 API Documentation
         </button>
+        <div style="padding: 8px 16px; border: 1px solid #28a745; border-radius: 4px; background: #f8f9fa; font-size: 0.9em;">
+            🔧 <strong>Test Domain:</strong> <code>test.apathy.ca</code> - 
+            <a href="?domains=test.apathy.ca&verbose=true" style="color: #007bff; text-decoration: none;">Try broken DNS example</a> | 
+            <a href="https://github.com/apathy-ca/dns_by_eye/tree/main/dns-examples" target="_blank" style="color: #007bff; text-decoration: none;">Setup Guide</a>
+        </div>
     </div>
     
     <footer>
