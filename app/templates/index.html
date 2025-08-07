@@ -211,7 +211,7 @@ if __name__ == "__main__":
         </button>
         <div style="padding: 8px 16px; border: 1px solid #28a745; border-radius: 4px; background: #f8f9fa; font-size: 0.9em;">
             🔧 <strong>Test Domain:</strong> <code>test.apathy.ca</code> - 
-            <a href="?domains=test.apathy.ca&verbose=true" style="color: #007bff; text-decoration: none;">Try broken DNS example</a> | 
+            <a href="#" id="testDomainLink" style="color: #007bff; text-decoration: none;">Try broken DNS example</a> | 
             <a href="https://github.com/apathy-ca/dns_by_eye/tree/main/dns-examples" target="_blank" style="color: #007bff; text-decoration: none;">Setup Guide</a>
         </div>
     </div>
@@ -658,6 +658,15 @@ if __name__ == "__main__":
                 e.preventDefault();
                 document.getElementById('domainForm').dispatchEvent(new Event('submit'));
             }
+        });
+
+        // Test domain link functionality
+        document.getElementById('testDomainLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('domainInput').value = 'test.apathy.ca';
+            document.getElementById('verboseCheckbox').checked = true;
+            document.getElementById('dnsServerSelect').value = 'system';
+            document.getElementById('domainForm').dispatchEvent(new Event('submit'));
         });
 
         // Load DNS servers when page loads
