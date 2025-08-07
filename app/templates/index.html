@@ -656,7 +656,8 @@ if __name__ == "__main__":
         document.getElementById('domainInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                document.getElementById('domainForm').dispatchEvent(new Event('submit'));
+                // Trigger the form submit button click instead of dispatching event
+                document.querySelector('#domainForm button[type="submit"]').click();
             }
         });
 
@@ -666,7 +667,8 @@ if __name__ == "__main__":
             document.getElementById('domainInput').value = 'test.apathy.ca';
             document.getElementById('verboseCheckbox').checked = true;
             document.getElementById('dnsServerSelect').value = 'system';
-            document.getElementById('domainForm').dispatchEvent(new Event('submit'));
+            // Trigger the form submit button click instead of dispatching event
+            document.querySelector('#domainForm button[type="submit"]').click();
         });
 
         // Load DNS servers when page loads
