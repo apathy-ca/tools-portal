@@ -72,7 +72,6 @@ For production deployment with SSL certificates:
 
 ```bash
 # Set up SSL certificates (replace with your domain and email)
-# This runs as a daemon - you can close the terminal after setup
 ./setup-ssl.sh your-domain.com admin@your-domain.com
 
 # Or without email (not recommended for production)
@@ -85,8 +84,8 @@ docker compose -f docker-compose.ssl.yaml exec certbot certbot certificates  # C
 docker compose -f docker-compose.ssl.yaml down            # Stop all services
 docker compose -f docker-compose.ssl.yaml restart         # Restart all services
 
-# Troubleshooting SSL issues:
-./troubleshoot-ssl.sh your-domain.com                     # Comprehensive SSL diagnostics
+# Troubleshooting issues:
+./scripts/troubleshoot.sh your-domain.com                 # Comprehensive diagnostics
 ```
 
 The SSL setup includes:
@@ -178,6 +177,27 @@ DNS_TIMEOUT = 3          # Individual query timeout
 DNS_LIFETIME = 6         # Total resolution timeout
 RATELIMIT_DEFAULT = "100 per day"
 CACHE_DEFAULT_TIMEOUT = 300
+```
+
+## Utility Scripts
+
+The project includes several utility scripts in the `scripts/` directory:
+
+- **`scripts/setup-ssl.sh`**: Generic SSL setup script for any domain
+- **`scripts/troubleshoot.sh`**: Comprehensive troubleshooting and diagnostics
+
+For backward compatibility, `setup-ssl.sh` in the root directory links to the new script.
+
+### Usage Examples
+```bash
+# SSL setup with email notifications
+./scripts/setup-ssl.sh example.com admin@example.com
+
+# Basic troubleshooting
+./scripts/troubleshoot.sh
+
+# Troubleshooting with domain-specific SSL checks
+./scripts/troubleshoot.sh example.com
 ```
 
 ## Development

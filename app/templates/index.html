@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:;">
     <title>DNS By Eye</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='dns_by_eye_favicon.png') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         body { font-family: Arial, sans-serif; margin: 2em; }
@@ -29,7 +30,7 @@
 </head>
 <body>
     <header style="display:flex; align-items:center; gap:10px; margin-bottom:1em;">
-        <img src="{{ url_for('static', filename='logo.svg') }}" alt="DNS By Eye Logo" style="height:40px; width:40px;">
+        <img src="{{ url_for('static', filename='dns_by_eye_200x200.png') }}" alt="DNS By Eye Logo" style="height:40px; width:40px;">
         <h1 style="margin:0;">DNS By Eye</h1>
     </header>
     <form id="domainForm" style="display:flex; align-items:center; gap:10px; margin-bottom:1em; max-width: 800px; flex-wrap: wrap;">
