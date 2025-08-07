@@ -238,14 +238,19 @@ For backward compatibility, `setup-ssl.sh` in the root directory links to the ne
 
 ### Maintenance
 
-**Generated Files Cleanup**: The application generates PNG graph files in `app/static/generated/` for each DNS analysis. These files can accumulate over time. Use the cleanup script periodically:
+**Generated Files Cleanup**: The application generates PNG graph files in `app/static/generated/` for each DNS analysis. 
+
+**Automatic Cleanup**: By default, both Docker Compose configurations include a cleanup service that automatically deletes generated files older than 1 day every 24 hours. This runs out of the box with no configuration needed.
+
+**Manual Cleanup**: You can also run cleanup manually using the script:
 
 ```bash
-# Weekly cleanup (recommended)
-./scripts/cleanup-generated.sh -d 7
+# Manual cleanup (files older than 7 days by default)
+./scripts/cleanup-generated.sh
 
-# Or set up a cron job for automatic cleanup
-# Add to crontab: 0 2 * * 0 /path/to/dns_by_eye/scripts/cleanup-generated.sh -d 7 -f
+# Custom cleanup options
+./scripts/cleanup-generated.sh -d 3    # Files older than 3 days
+./scripts/cleanup-generated.sh -s 500M # If total size > 500MB
 ```
 
 ## Development

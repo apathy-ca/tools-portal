@@ -25,6 +25,21 @@ services:
     volumes:
       - redis_data:/data
 
+  cleanup:
+    build: .
+    volumes:
+      - generated_files:/app/app/static/generated
+    restart: unless-stopped
+    command: >
+      sh -c "
+      while true; do
+        echo 'Running daily cleanup of generated files...'
+        find /app/app/static/generated -name '*.png' -type f -mtime +1 -delete
+        echo 'Cleanup completed. Next run in 24 hours.'
+        sleep 86400
+      done
+      "
+
 volumes:
   redis_data:
   generated_files:
