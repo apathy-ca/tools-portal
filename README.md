@@ -300,8 +300,8 @@ This project serves as a comprehensive example of **100% LLM-assisted software d
 
 ### Development Costs
 - **ChatGPT (GPT-4)**: < $1.00 USD total
-- **Claude Sonnet (via Cline)**: $0.73 USD total
-- **Total Project Cost**: $1.73 USD
+- **Claude Sonnet (via Cline)**: $29.27 USD total
+- **Total Project Cost**: $30.27 USD
 
 This demonstrates that sophisticated, production-ready applications can be developed cost-effectively using modern LLMs, with total development costs remaining well under typical hourly consulting rates.
 
