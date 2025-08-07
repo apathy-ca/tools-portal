@@ -53,6 +53,10 @@ The `test.apathy.ca` zone includes several intentional DNS problems:
    sudo systemctl reload bind9
    ```
 
+   **Important**: Make sure to use the correct zone name with the correct zone file:
+   - `apathy.ca` zone uses `apathy.ca.zone` file
+   - `test.apathy.ca` zone uses `test.apathy.ca.zone` file
+
 4. **Test the broken domain:**
    ```bash
    dig @localhost test.apathy.ca NS
