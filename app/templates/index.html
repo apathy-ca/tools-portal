@@ -51,19 +51,8 @@
             <input type="checkbox" id="debugCheckbox">
             Debug mode
         </label>
-        <button type="button" id="docsToggle" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
-            📖 API Documentation
-        </button>
         <button type="button" id="shareUrlBtn" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
             🔗 Share URL
-        </button>
-    </div>
-    <div id="exportButtons" style="display:none; margin-bottom:1em; gap:10px;">
-        <button type="button" id="exportJsonBtn" style="background:#007bff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
-            📄 Export JSON
-        </button>
-        <button type="button" id="exportCsvBtn" style="background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
-            📊 Export CSV
         </button>
     </div>
     <div id="documentation" style="display:none; margin-top:2em; padding:20px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px;">
@@ -198,7 +187,29 @@ if __name__ == "__main__":
     <div id="chain" class="chain"></div>
     <div id="tree" class="tree"></div>
     <div id="graphviz" style="margin-top:2em;"></div>
+    
+    <!-- Export buttons moved to bottom -->
+    <div id="exportButtons" style="display:none; margin-top:2em; margin-bottom:1em; gap:10px;">
+        <h3>Export Results</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="button" id="exportJsonBtn" style="background:#007bff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
+                📄 Export JSON
+            </button>
+            <button type="button" id="exportCsvBtn" style="background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">
+                📊 Export CSV
+            </button>
+        </div>
+    </div>
+    
     <hr style="margin-top: 2em; margin-bottom: 1em;">
+    
+    <!-- Documentation moved to bottom -->
+    <div style="margin-bottom: 1em;">
+        <button type="button" id="docsToggle" style="background:none; border:1px solid #ccc; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:0.9em;">
+            📖 API Documentation
+        </button>
+    </div>
+    
     <footer>
         <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; text-align: center;">
             <span>Inspired by <a href="https://www.zonecut.net/dns/" target="_blank">dnsbajaj</a></span>
@@ -630,6 +641,14 @@ if __name__ == "__main__":
                     }
                     addCopyButtons();
                 }, 50);
+            }
+        });
+
+        // Add Enter key functionality to textarea
+        document.getElementById('domainInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('domainForm').dispatchEvent(new Event('submit'));
             }
         });
 
