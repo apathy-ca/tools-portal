@@ -35,7 +35,7 @@ DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation 
 
 ## Live Demo
 
-Try DNS By Eye online at: **[http://tools.apathy.ca:5000](http://tools.apathy.ca:5000)**
+Try DNS By Eye online at: **[https://tools.apathy.ca](https://tools.apathy.ca)**
 
 ## Quickstart (Docker)
 
@@ -217,11 +217,13 @@ pytest tests/
 
 ## License
 
-This project is open source. See LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The MIT License is one of the most permissive open source licenses, allowing you to use, modify, distribute, and sell this software for any purpose without limitation.
 
 ## Links
 
-- **Live Demo**: [http://tools.apathy.ca:5000](http://tools.apathy.ca:5000)
+- **Live Demo**: [https://tools.apathy.ca](https://tools.apathy.ca)
 - **GitHub Repository**: [https://github.com/apathy-ca/dns_by_eye](https://github.com/apathy-ca/dns_by_eye)
 
 ## Acknowledgments
