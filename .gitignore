@@ -129,8 +129,6 @@ dmypy.json
 .pyre/
 
 # DNS By Eye specific
-app/static/*.png
-app/static/*.svg
 .DS_Store
 *.swp
 *.swo
