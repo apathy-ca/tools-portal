@@ -44,6 +44,9 @@ def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
     Trace DNS delegation from root (.) down to authoritative nameserver.
     Returns a list of dicts with zone, nameservers, and optional verbose info.
     Constructs chain starting from root (.) at layer 1, then TLD, then domain, etc.
+    
+    This function is resilient to failures - it will trace as far as possible
+    and stop gracefully when it encounters unresolvable zones.
     """
     # Use custom resolver if provided, otherwise use default
     query_resolver = custom_resolver if custom_resolver else resolver
@@ -59,9 +62,17 @@ def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
         zone = '.'.join(reversed_labels[:i+1][::-1])
         chain.append(zone)
 
+    # Track if we've encountered a fatal error that should stop further tracing
+    should_continue = True
+    
     for i in range(len(chain)):
+        if not should_continue:
+            break
+            
         zone = chain[i]
         start_time = time.time()
+        error_type = None
+        
         try:
             ns_records = query_resolver.resolve(zone, 'NS')
             end_time = time.time()
@@ -90,23 +101,77 @@ def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
                         pass
                 if glue:
                     verbose_info = " | ".join(glue)
-        except Exception as e:
+                    
+        except dns.resolver.NXDOMAIN as e:
+            # Domain doesn't exist - this is a definitive answer, stop here
             end_time = time.time()
             response_time = round((end_time - start_time) * 1000, 2)
-            ns_list = [f"Error: {e}"]
-            verbose_info = str(e) if verbose else ""
+            ns_list = [f"NXDOMAIN: {zone} does not exist"]
+            verbose_info = f"Domain {zone} does not exist" if verbose else ""
+            error_type = "NXDOMAIN"
+            should_continue = False
+            
+        except dns.resolver.NoAnswer as e:
+            # No NS records found for this zone
+            end_time = time.time()
+            response_time = round((end_time - start_time) * 1000, 2)
+            ns_list = [f"No NS records: {zone} has no nameservers"]
+            verbose_info = f"No NS records found for {zone}" if verbose else ""
+            error_type = "NO_NS"
+            should_continue = False
+            
+        except dns.resolver.Timeout as e:
+            # Timeout - could be temporary, but stop tracing deeper
+            end_time = time.time()
+            response_time = round((end_time - start_time) * 1000, 2)
+            ns_list = [f"Timeout: Query for {zone} timed out"]
+            verbose_info = f"DNS query timeout for {zone}" if verbose else ""
+            error_type = "TIMEOUT"
+            should_continue = False
+            
+        except dns.resolver.NoNameservers as e:
+            # No nameservers available to answer the query
+            end_time = time.time()
+            response_time = round((end_time - start_time) * 1000, 2)
+            ns_list = [f"No nameservers: No servers available for {zone}"]
+            verbose_info = f"No nameservers available for {zone}" if verbose else ""
+            error_type = "NO_NAMESERVERS"
+            should_continue = False
+            
+        except Exception as e:
+            # Other errors - log them but continue if it's not too deep in the chain
+            end_time = time.time()
+            response_time = round((end_time - start_time) * 1000, 2)
+            error_msg = str(e)
+            ns_list = [f"Error: {error_msg}"]
+            verbose_info = f"Query error for {zone}: {error_msg}" if verbose else ""
+            error_type = "OTHER"
+            
+            # If we're past the TLD level and getting errors, stop tracing
+            if i > 1:  # 0=root, 1=TLD, 2+=domain levels
+                should_continue = False
         
         # Flag slow responses (>2000ms is considered slow for DNS)
         is_slow = response_time > 2000
-        timing_info[zone] = {'response_time': response_time, 'is_slow': is_slow}
+        timing_info[zone] = {
+            'response_time': response_time, 
+            'is_slow': is_slow,
+            'error_type': error_type
+        }
         
         result.append({
             'zone': zone, 
             'nameservers': ns_list, 
             'verbose': verbose_info if verbose else None,
             'response_time': response_time,
-            'is_slow': is_slow
+            'is_slow': is_slow,
+            'error_type': error_type,
+            'trace_stopped': not should_continue and i < len(chain) - 1
         })
+    
+    # If we stopped early, update the chain to reflect what was actually traced
+    if not should_continue and len(result) < len(chain):
+        chain = chain[:len(result)]
     
     return result, chain, timing_info if debug else {}
 
@@ -128,6 +193,7 @@ def build_layer_graph(zone, ns_list, parent_ns_list=None, verbose_info=None, ver
     Show arrows between NS if they refer to themselves or each other (only for final layer).
     Draw box around NS that match delegation from parent layer.
     For root servers, limit to 4 and show indication of more.
+    Handles error nameservers gracefully.
     """
     dot = Digraph(format='png')
     dot.attr(rankdir='TB')
@@ -140,27 +206,44 @@ def build_layer_graph(zone, ns_list, parent_ns_list=None, verbose_info=None, ver
     label = zone
     dot.node(zone_node, label, shape='box', style='filled', fillcolor='#e0e0ff')
 
+    # Filter out error entries and valid nameservers
+    error_entries = [ns for ns in ns_list if ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
+    valid_ns_list = [ns for ns in ns_list if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
+
     # For root servers, limit to 4 and show a "..." node
     is_root = zone == '.'
-    display_ns_list = ns_list
+    display_ns_list = valid_ns_list
     has_more = False
     
-    if is_root and len(ns_list) > 4:
-        display_ns_list = ns_list[:4]
+    if is_root and len(valid_ns_list) > 4:
+        display_ns_list = valid_ns_list[:4]
         has_more = True
 
     ns_nodes = {}
+    
+    # Handle valid nameservers
     for ns in display_ns_list:
-        ns_node = f"ns_{index}_{ns.replace('.', '_')}"
+        # Sanitize node names to avoid graphviz issues
+        safe_ns = ns.replace('.', '_').replace('-', '_').replace(':', '_')
+        ns_node = f"ns_{index}_{safe_ns}"
         ns_nodes[ns] = ns_node
 
     # Add "more servers" node if needed
     if has_more:
         more_node = f"more_{index}"
-        ns_nodes[f"... and {len(ns_list) - 4} more"] = more_node
+        ns_nodes[f"... and {len(valid_ns_list) - 4} more"] = more_node
 
-    # Determine which NS are referenced by parent layer
-    referenced_ns = set(parent_ns_list) if parent_ns_list else set()
+    # Handle error entries
+    if error_entries:
+        error_node = f"error_{index}"
+        error_text = "\\n".join(error_entries)
+        ns_nodes["ERROR"] = error_node
+
+    # Determine which NS are referenced by parent layer (only valid ones)
+    referenced_ns = set()
+    if parent_ns_list:
+        valid_parent_ns = [ns for ns in parent_ns_list if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
+        referenced_ns = set(valid_parent_ns)
 
     # Draw NS nodes, color based on whether referenced by parent
     for ns in display_ns_list:
@@ -175,7 +258,11 @@ def build_layer_graph(zone, ns_list, parent_ns_list=None, verbose_info=None, ver
 
     # Add "more servers" node
     if has_more:
-        dot.node(more_node, f"... and {len(ns_list) - 4} more", shape='ellipse', style='filled,dashed', fillcolor='#f0f0f0', color='#888888')
+        dot.node(more_node, f"... and {len(valid_ns_list) - 4} more", shape='ellipse', style='filled,dashed', fillcolor='#f0f0f0', color='#888888')
+
+    # Add error node if there are errors
+    if error_entries:
+        dot.node(error_node, error_text, shape='box', style='filled', fillcolor='#ffcccc', color='red')
 
     # Edges from zone to NS
     for ns in display_ns_list:
@@ -186,20 +273,29 @@ def build_layer_graph(zone, ns_list, parent_ns_list=None, verbose_info=None, ver
     if has_more:
         dot.edge(zone_node, more_node, style='dashed', color='#888888')
 
+    # Edge to error node
+    if error_entries:
+        dot.edge(zone_node, error_node, color='red', style='dashed')
+
     # If this is the final layer (no children), add arrows between NS if they refer to themselves or each other
+    # Only do this for valid nameservers
     if parent_ns_list is not None and len(display_ns_list) > 1:
         # Check NS refer to each other or themselves by resolving NS records of each NS
         for ns in display_ns_list:
+            if ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+                continue
             try:
                 ns_ns_records = dns.resolver.resolve(ns, 'NS')
                 ns_ns_list = [r.to_text() for r in ns_ns_records]
             except Exception:
                 ns_ns_list = []
             for target_ns in display_ns_list:
+                if target_ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+                    continue
                 if target_ns in ns_ns_list:
                     dot.edge(ns_nodes[ns], ns_nodes[target_ns], color='blue', style='dashed')
 
-    # Draw box around referenced NS
+    # Draw box around referenced NS (only valid ones)
     if referenced_ns:
         with dot.subgraph(name=f"cluster_{index}") as c:
             c.attr(style='dashed', color='blue')
@@ -365,10 +461,18 @@ def api_delegation():
         cross_ref_results = {}
         cross_ref_graph_url = None
         if trace:
-            last_level_ns = [ns for ns in trace[-1]['nameservers'] if not ns.startswith("Error:")]
+            # Filter out error nameservers more comprehensively
+            last_level_ns = [ns for ns in trace[-1]['nameservers'] 
+                           if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
             if last_level_ns:
-                cross_ref_results = test_last_level_ns_references(last_level_ns, domain)
-                cross_ref_graph_url = build_cross_ref_graph(cross_ref_results, domain, prefix)
+                try:
+                    cross_ref_results = test_last_level_ns_references(last_level_ns, domain)
+                    cross_ref_graph_url = build_cross_ref_graph(cross_ref_results, domain, prefix)
+                except Exception as e:
+                    # If cross-reference analysis fails, continue without it
+                    app.logger.warning(f"Cross-reference analysis failed for {domain}: {e}")
+                    cross_ref_results = {}
+                    cross_ref_graph_url = None
         return jsonify({
             'trace': trace,
             'graph_urls': graph_urls,
