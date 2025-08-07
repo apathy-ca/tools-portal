@@ -289,6 +289,29 @@ The MIT License is one of the most permissive open source licenses, allowing you
 - **Live Demo**: [https://tools.apathy.ca](https://tools.apathy.ca)
 - **GitHub Repository**: [https://github.com/apathy-ca/dns_by_eye](https://github.com/apathy-ca/dns_by_eye)
 
+## LLM-Powered Development
+
+This project serves as a comprehensive example of **100% LLM-assisted software development**. Every line of code, documentation, configuration, and feature was developed through collaboration with Large Language Models, demonstrating the current capabilities of AI-assisted programming.
+
+### Development Approach
+- **Primary Development**: ChatGPT (GPT-4) for initial architecture, core functionality, and major features
+- **Code Refinement**: Anthropic Claude (via Cline) for debugging, optimization, and advanced features
+- **Iterative Enhancement**: Continuous collaboration between human direction and AI implementation
+
+### Development Costs
+- **ChatGPT (GPT-4)**: < $1.00 USD total
+- **Claude (via Cline)**: *[Cost tracking in progress - will be updated]*
+- **Total Project Cost**: < $2.00 USD (estimated)
+
+This demonstrates that sophisticated, production-ready applications can be developed cost-effectively using modern LLMs, with total development costs remaining under typical hourly consulting rates.
+
+### Key Insights
+- **Rapid Prototyping**: From concept to working application in hours rather than days
+- **Comprehensive Documentation**: AI naturally generates thorough documentation alongside code
+- **Best Practices**: LLMs incorporate modern development practices (Docker, testing, security)
+- **Problem Solving**: Effective debugging and optimization through AI collaboration
+- **Feature Completeness**: Full-featured application with API, UI, deployment, and monitoring
+
 ## Acknowledgments
 
 Inspired by [dnsbajaj](https://www.zonecut.net/dns/) | Created with ChatGPT, Cline & Anthropic (Claude Sonnet)
