@@ -330,40 +330,84 @@ def test_last_level_ns_references(ns_list, domain):
     This shows if nameservers are consistent in their responses.
     Also fetch A and AAAA records for each nameserver.
     Returns a dict with ns as key and dict of references and IPs as value.
+    
+    This function is resilient to broken nameservers and will continue processing
+    even if some nameservers are unreachable or misconfigured.
     """
     results = {}
     for ns in ns_list:
-        ns_result = {}
-        # Query this specific nameserver for NS records of the domain
-        try:
-            # Create a resolver that uses only this nameserver
-            specific_resolver = dns.resolver.Resolver()
-            specific_resolver.nameservers = [dns.resolver.resolve(ns, 'A')[0].to_text()]
-            specific_resolver.timeout = Config.DNS_TIMEOUT
-            specific_resolver.lifetime = Config.DNS_LIFETIME
-            
-            # Ask this nameserver what it thinks the NS records are for the domain
-            ns_ns_records = specific_resolver.resolve(domain, 'NS')
-            ns_ns_list = [r.to_text() for r in ns_ns_records]
-            # Filter to only those in ns_list for comparison
-            referenced = [ref for ref in ns_ns_list if ref in ns_list]
-            ns_result['references'] = referenced
-        except dns.resolver.NoAnswer:
-            ns_result['references'] = []
-        except Exception as e:
-            ns_result['references'] = [f"Error: {e}"]
+        ns_result = {
+            'references': [],
+            'A': [],
+            'AAAA': [],
+            'status': 'unknown'
+        }
         
-        # Get A and AAAA records for the nameserver itself
+        # First, try to get A and AAAA records for the nameserver itself
+        ns_ip = None
         try:
             a_records = dns.resolver.resolve(ns, 'A')
             ns_result['A'] = [a.to_text() for a in a_records]
-        except Exception:
-            ns_result['A'] = []
+            ns_ip = ns_result['A'][0]  # Use first A record for querying
+            ns_result['status'] = 'reachable'
+        except dns.resolver.NXDOMAIN:
+            ns_result['status'] = 'nxdomain'
+            ns_result['A'] = ['NXDOMAIN: Nameserver does not exist']
+        except dns.resolver.NoAnswer:
+            ns_result['status'] = 'no_a_record'
+            ns_result['A'] = ['No A record found']
+        except dns.resolver.Timeout:
+            ns_result['status'] = 'timeout'
+            ns_result['A'] = ['Timeout resolving A record']
+        except Exception as e:
+            ns_result['status'] = 'error'
+            ns_result['A'] = [f'Error resolving A record: {e}']
+        
+        # Try to get AAAA records
         try:
             aaaa_records = dns.resolver.resolve(ns, 'AAAA')
             ns_result['AAAA'] = [a.to_text() for a in aaaa_records]
         except Exception:
-            ns_result['AAAA'] = []
+            # AAAA records are optional, so we don't change status for this
+            pass
+        
+        # Only try to query the nameserver if we have an IP address
+        if ns_ip and ns_result['status'] == 'reachable':
+            try:
+                # Create a resolver that uses only this nameserver
+                specific_resolver = dns.resolver.Resolver()
+                specific_resolver.nameservers = [ns_ip]
+                specific_resolver.timeout = Config.DNS_TIMEOUT
+                specific_resolver.lifetime = Config.DNS_LIFETIME
+                
+                # Ask this nameserver what it thinks the NS records are for the domain
+                ns_ns_records = specific_resolver.resolve(domain, 'NS')
+                ns_ns_list = [r.to_text() for r in ns_ns_records]
+                # Filter to only those in ns_list for comparison
+                referenced = [ref for ref in ns_ns_list if ref in ns_list]
+                ns_result['references'] = referenced
+                ns_result['query_status'] = 'success'
+                
+            except dns.resolver.NXDOMAIN:
+                ns_result['references'] = []
+                ns_result['query_status'] = 'nxdomain'
+            except dns.resolver.NoAnswer:
+                ns_result['references'] = []
+                ns_result['query_status'] = 'no_answer'
+            except dns.resolver.Timeout:
+                ns_result['references'] = ['Timeout querying nameserver']
+                ns_result['query_status'] = 'timeout'
+            except dns.resolver.NoNameservers:
+                ns_result['references'] = ['No nameservers available']
+                ns_result['query_status'] = 'no_nameservers'
+            except Exception as e:
+                ns_result['references'] = [f"Error querying nameserver: {e}"]
+                ns_result['query_status'] = 'error'
+        else:
+            # Can't query this nameserver
+            ns_result['references'] = [f"Cannot query: {ns_result['status']}"]
+            ns_result['query_status'] = 'unreachable'
+        
         results[ns] = ns_result
     return results
 
@@ -373,6 +417,7 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
     Shows arrows between nameservers that reference each other.
     Marks servers that do not reference themselves with red border.
     Includes a node for the domain pointing to its nameservers.
+    Handles broken/unreachable nameservers gracefully.
     """
     dot = Digraph(format='png')
     dot.attr(rankdir='LR')
@@ -380,19 +425,43 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
     title = f'Cross-Reference Analysis for: {domain}' if domain else 'Last Level Nameserver Cross-Reference'
     dot.attr(label=title, labelloc='t', fontsize='20')
 
-    # Collect all servers from keys and all references
+    # Collect all servers from keys and valid references (filter out error messages)
     all_servers = set(cross_ref_results.keys())
     for info in cross_ref_results.values():
         if isinstance(info, dict):
-            all_servers.update(info.get('references', []))
+            refs = info.get('references', [])
+            # Only add references that don't start with error messages
+            valid_refs = [ref for ref in refs if not ref.startswith(('Error:', 'Timeout', 'Cannot query:', 'NXDOMAIN:', 'No nameservers'))]
+            all_servers.update(valid_refs)
 
     # Add domain node if provided
     if domain:
         dot.node(domain, domain, shape='box', style='filled', fillcolor='#ccccff')
 
-    # Add nodes with default green fill
+    # Add nodes with colors based on their status
     for server in all_servers:
-        dot.node(server, server, shape='ellipse', style='filled', fillcolor='#eaffea')
+        if server in cross_ref_results:
+            # This is a nameserver we tested
+            info = cross_ref_results[server]
+            status = info.get('status', 'unknown')
+            
+            if status == 'reachable':
+                fillcolor = '#eaffea'  # green - working
+                color = 'black'
+            elif status == 'nxdomain':
+                fillcolor = '#ffcccc'  # red - doesn't exist
+                color = 'red'
+            elif status in ['timeout', 'error']:
+                fillcolor = '#ffffcc'  # yellow - problematic
+                color = 'orange'
+            else:
+                fillcolor = '#f0f0f0'  # gray - unknown
+                color = 'gray'
+                
+            dot.node(server, server, shape='ellipse', style='filled', fillcolor=fillcolor, color=color)
+        else:
+            # This is a referenced server we didn't test directly
+            dot.node(server, server, shape='ellipse', style='filled', fillcolor='#eaffea')
 
     # Add edges from domain to its nameservers (the keys of cross_ref_results)
     if domain:
@@ -403,24 +472,49 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
     for ns, info in cross_ref_results.items():
         if isinstance(info, dict):
             refs = info.get('references', [])
-            for ref in refs:
+            # Only draw edges for valid references
+            valid_refs = [ref for ref in refs if not ref.startswith(('Error:', 'Timeout', 'Cannot query:', 'NXDOMAIN:', 'No nameservers'))]
+            
+            for ref in valid_refs:
                 if ref in all_servers and ref != ns:  # Don't draw self-loops for clarity
-                    dot.edge(ns, ref, color='blue', style='dashed', label='references')
+                    # Color the edge based on query status
+                    query_status = info.get('query_status', 'unknown')
+                    if query_status == 'success':
+                        edge_color = 'blue'
+                    elif query_status in ['timeout', 'error']:
+                        edge_color = 'orange'
+                    else:
+                        edge_color = 'gray'
+                    
+                    dot.edge(ns, ref, color=edge_color, style='dashed', label='references')
 
     # Mark servers that do not reference themselves with red border
     for ns, info in cross_ref_results.items():
         if isinstance(info, dict):
             refs = info.get('references', [])
-            if ns not in refs:
+            valid_refs = [ref for ref in refs if not ref.startswith(('Error:', 'Timeout', 'Cannot query:', 'NXDOMAIN:', 'No nameservers'))]
+            
+            if ns not in valid_refs and info.get('status') == 'reachable':
+                # Only mark as problematic if the server is reachable but doesn't self-reference
                 dot.node(ns, ns, shape='ellipse', style='filled,bold', fillcolor='#eaffea', color='red', penwidth='3')
 
     # Self-reference arrows (draw these separately for clarity)
     for ns, info in cross_ref_results.items():
         if isinstance(info, dict):
             refs = info.get('references', [])
-            if ns in refs:
+            valid_refs = [ref for ref in refs if not ref.startswith(('Error:', 'Timeout', 'Cannot query:', 'NXDOMAIN:', 'No nameservers'))]
+            
+            if ns in valid_refs:
                 # Create a self-loop
-                dot.edge(ns, ns, color='green', style='solid', label='self-ref')
+                query_status = info.get('query_status', 'unknown')
+                if query_status == 'success':
+                    edge_color = 'green'
+                elif query_status in ['timeout', 'error']:
+                    edge_color = 'orange'
+                else:
+                    edge_color = 'gray'
+                    
+                dot.edge(ns, ns, color=edge_color, style='solid', label='self-ref')
 
     # Save to static/generated with unique prefix to avoid collisions
     static_dir = os.path.join(app.root_path, "static", "generated")
