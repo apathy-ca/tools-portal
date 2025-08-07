@@ -1,0 +1,50 @@
+; DNS By Eye Test Zone - Intentionally Broken Configuration
+; This zone demonstrates various DNS delegation issues for testing purposes
+
+$TTL 300
+$ORIGIN test.apathy.ca.
+
+; SOA record with intentionally short TTL for testing
+@       IN      SOA     ns1.test.apathy.ca. admin.test.apathy.ca. (
+                        2025010701      ; Serial (YYYYMMDDNN)
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        300             ; Minimum TTL
+                        )
+
+; Nameserver records - mix of working and broken nameservers
+@       IN      NS      ns1.test.apathy.ca.
+@       IN      NS      ns2.test.apathy.ca.
+@       IN      NS      ns3.broken.example.    ; Intentionally broken - non-existent domain
+@       IN      NS      ns4.test.apathy.ca.
+
+; A records for some nameservers (missing glue for others)
+ns1     IN      A       97.107.131.151          ; Working nameserver
+ns2     IN      A       192.0.2.2               ; RFC 5737 test address (may not respond)
+; ns3 has no A record (broken glue)
+ns4     IN      A       203.0.113.4             ; Another RFC 5737 test address
+
+; AAAA records for IPv6 (partial coverage)
+ns1     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d  ; Working IPv6
+; Missing AAAA for other nameservers
+
+; Some test records
+@       IN      A       97.107.131.151
+www     IN      A       97.107.131.151
+broken  IN      A       192.0.2.99              ; Test address
+
+; Subdomain with its own delegation issues
+sub     IN      NS      ns1.sub.test.apathy.ca.
+sub     IN      NS      ns2.sub.test.apathy.ca.
+sub     IN      NS      nonexistent.example.    ; Broken delegation
+
+; Missing glue records for subdomain nameservers
+; ns1.sub.test.apathy.ca. and ns2.sub.test.apathy.ca. have no A records
+
+; MX record pointing to non-existent host
+@       IN      MX      10 mail.broken.example.
+
+; TXT records for testing
+@       IN      TXT     "DNS By Eye Test Zone - Intentionally Broken"
+@       IN      TXT     "v=spf1 include:broken.example ~all"

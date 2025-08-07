@@ -1,0 +1,54 @@
+; DNS By Eye Parent Zone Configuration
+; This shows how to delegate test.apathy.ca to demonstrate DNS issues
+
+$TTL 3600
+$ORIGIN apathy.ca.
+
+; SOA record
+@       IN      SOA     ns1.apathy.ca. admin.apathy.ca. (
+                        2025010701      ; Serial (YYYYMMDDNN)
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        3600            ; Minimum TTL
+                        )
+
+; Main nameservers for apathy.ca
+@       IN      NS      ns1.apathy.ca.
+@       IN      NS      ns2.apathy.ca.
+
+; Glue records for main nameservers
+ns1     IN      A       97.107.131.151
+ns2     IN      A       97.107.131.151
+ns1     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d
+ns2     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d
+
+; Main domain records
+@       IN      A       97.107.131.151
+@       IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d
+www     IN      A       97.107.131.151
+tools   IN      A       97.107.131.151
+
+; Delegation to test subdomain with intentional issues
+test    IN      NS      ns1.test.apathy.ca.
+test    IN      NS      ns2.test.apathy.ca.
+test    IN      NS      ns3.broken.example.    ; Broken nameserver reference
+test    IN      NS      ns4.test.apathy.ca.
+
+; Glue records for test subdomain (some missing/broken)
+ns1.test        IN      A       97.107.131.151          ; Working
+ns2.test        IN      A       192.0.2.2               ; RFC 5737 test (may not respond)
+; ns3.broken.example has no glue (and doesn't exist)
+ns4.test        IN      A       203.0.113.4             ; RFC 5737 test (may not respond)
+
+; IPv6 glue (partial)
+ns1.test        IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d
+; Missing IPv6 for other test nameservers
+
+; MX records
+@       IN      MX      10 mail.apathy.ca.
+mail    IN      A       97.107.131.151
+
+; TXT records
+@       IN      TXT     "v=spf1 mx ~all"
+@       IN      TXT     "DNS By Eye Demo Domain"

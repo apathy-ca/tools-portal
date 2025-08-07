@@ -1,0 +1,34 @@
+// BIND Configuration for DNS By Eye Test Zones
+// Add this to your /etc/bind/named.conf.local file
+
+// Main apathy.ca zone
+zone "apathy.ca" {
+    type master;
+    file "/etc/bind/zones/apathy.ca.zone";
+    allow-query { any; };
+    allow-transfer { any; };
+    notify yes;
+};
+
+// Test subdomain zone with intentional issues
+zone "test.apathy.ca" {
+    type master;
+    file "/etc/bind/zones/test.apathy.ca.zone";
+    allow-query { any; };
+    allow-transfer { any; };
+    notify yes;
+};
+
+// Optional: Reverse DNS zones for demonstration
+zone "151.131.107.97.in-addr.arpa" {
+    type master;
+    file "/etc/bind/zones/97.107.131.151.rev";
+    allow-query { any; };
+};
+
+// IPv6 reverse zone
+zone "d.2.4.b.e.e.b.e.f.f.5.9.c.3.0.f.0.0.0.0.3.0.0.0.6.0.0.2.ip6.arpa" {
+    type master;
+    file "/etc/bind/zones/ipv6.rev";
+    allow-query { any; };
+};
