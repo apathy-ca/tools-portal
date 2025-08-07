@@ -207,7 +207,8 @@ docker compose -f docker-compose.ssl.yaml run --rm -p 80:80 certbot certonly \
     -d $DOMAIN
 
 # Check if certificate was created
-if docker compose -f docker-compose.ssl.yaml run --rm certbot sh -c "test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem" 2>/dev/null; then
+echo -e "${BLUE}Verifying certificate was created...${NC}"
+if docker compose -f docker-compose.ssl.yaml run --rm --entrypoint="" certbot test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
     echo -e "${GREEN}✓ SSL certificate generated successfully!${NC}"
 else
     echo -e "${RED}✗ SSL certificate generation failed!${NC}"
