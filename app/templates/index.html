@@ -110,7 +110,7 @@ Returns: Service health status</code></pre>
 curl -X GET "http://localhost:5000/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
 
 # Get delegation trace using live demo instance
-curl -X GET "http://tools.apathy.ca:5000/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
+curl -X GET "https://tools.apathy.ca/api/trace/google.com?dns_server=1.1.1.1&verbose=true"
 
 # Full analysis with visualizations (local)
 curl -X POST "http://localhost:5000/api/delegation" \
@@ -118,7 +118,7 @@ curl -X POST "http://localhost:5000/api/delegation" \
      -d '{"domain": "github.com", "verbose": true, "dns_server": "8.8.8.8"}'
 
 # Full analysis with visualizations (live demo)
-curl -X POST "http://tools.apathy.ca:5000/api/delegation" \
+curl -X POST "https://tools.apathy.ca/api/delegation" \
      -H "Content-Type: application/json" \
      -d '{"domain": "github.com", "verbose": true, "dns_server": "8.8.8.8"}'</code></pre>
         
@@ -127,7 +127,7 @@ curl -X POST "http://tools.apathy.ca:5000/api/delegation" \
 import json
 
 # Base URL for the API (use live demo or local instance)
-BASE_URL = "http://tools.apathy.ca:5000"  # Live demo
+BASE_URL = "https://tools.apathy.ca"  # Live demo
 # BASE_URL = "http://localhost:5000"      # Local instance
 
 def trace_domain(domain, dns_server="system", verbose=False):
@@ -219,7 +219,7 @@ if __name__ == "__main__":
             <span>|</span>
             <span>Created by ChatGPT, Cline & Anthropic (Claude Sonnet)</span>
             <span>|</span>
-            <span><a href="http://tools.apathy.ca:5000" target="_blank">🌐 Live Demo</a></span>
+            <span><a href="https://tools.apathy.ca" target="_blank">🌐 Live Demo</a></span>
             <span>|</span>
             <span><a href="https://github.com/apathy-ca/dns_by_eye" target="_blank">📂 GitHub Repository</a></span>
         </div>
