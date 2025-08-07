@@ -633,7 +633,7 @@ def api_health():
     return jsonify({
         'status': 'healthy',
         'service': 'DNS By Eye',
-        'version': '1.0.0'
+        'version': '1.0.1'
     })
 
 @app.route('/api/dns-servers', methods=['GET'])

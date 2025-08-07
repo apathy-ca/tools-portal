@@ -1,13 +1,15 @@
 # DNS By Eye
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation chains from the root through TLDs to the authoritative nameservers, then renders interactive graphs of each layer and cross-reference diagrams. Features include:
 
+- **Resilient DNS tracing**: Gracefully handles broken nameservers and non-existent domains
 - **Multi-domain comparison**: Compare DNS delegation paths across multiple domains
 - **Response time monitoring**: Track DNS query performance with slow response indicators
 - **Interactive visualizations**: Graphviz-based PNG diagrams for each delegation layer
 - **Cross-reference analysis**: Detailed analysis of nameserver relationships and consistency
+- **Error visualization**: Visual indicators for broken nameservers and DNS failures
 - **Comprehensive API**: RESTful endpoints for programmatic access
 - **Export capabilities**: JSON and CSV export formats
 - **URL sharing**: Shareable URLs with query parameters for easy collaboration
@@ -24,6 +26,14 @@ DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation 
 - Cross-reference graph of last-level nameservers
 - Response time tracking with slow query detection
 - Multi-domain comparison analysis
+
+### Resilient DNS Tracing (New in v1.0.1)
+- **Graceful error handling**: Continues tracing as far as possible when encountering DNS failures
+- **Specific error detection**: Distinguishes between NXDOMAIN, timeouts, and other DNS errors
+- **Visual error indicators**: Red error nodes in graphs show broken nameservers and DNS issues
+- **Partial results**: Provides useful information even when some nameservers are unreachable
+- **Broken nameserver support**: Handles misconfigured nameservers without complete failure
+- **Enhanced cross-reference analysis**: Color-coded nameservers based on reachability status
 
 ### Technical Features
 - In-memory caching (Flask-Caching) with configurable TTL
