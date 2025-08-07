@@ -100,6 +100,29 @@ The SSL setup includes:
 - For SSL setup, ensure your domain points to your server before running the setup script
 - Certificates are automatically renewed every 12 hours
 
+### Updating Existing Deployments
+
+If you have an existing DNS By Eye deployment and want to update to the latest version:
+
+```bash
+# 1. Pull the latest code
+git pull origin main
+
+# 2. Update nginx configuration (this fixes static file serving issues)
+docker compose -f docker-compose.ssl.yaml restart nginx
+
+# 3. If graphs still don't load, restart all services
+docker compose -f docker-compose.ssl.yaml restart
+
+# 4. Optional: Clean up old generated files
+./scripts/cleanup-generated.sh
+
+# 5. Verify the update worked
+curl -I https://your-domain.com/static/dns_by_eye_favicon.png
+```
+
+**Note**: Recent updates fixed an issue where generated graph images were returning 404 errors. The nginx configuration now properly routes all static file requests to the Flask application.
+
 ## API Endpoints
 
 ### Full Delegation Analysis
@@ -185,6 +208,7 @@ The project includes several utility scripts in the `scripts/` directory:
 
 - **`scripts/setup-ssl.sh`**: Generic SSL setup script for any domain
 - **`scripts/troubleshoot.sh`**: Comprehensive troubleshooting and diagnostics
+- **`scripts/cleanup-generated.sh`**: Clean up old generated graph files to manage disk space
 
 For backward compatibility, `setup-ssl.sh` in the root directory links to the new script.
 
@@ -198,6 +222,30 @@ For backward compatibility, `setup-ssl.sh` in the root directory links to the ne
 
 # Troubleshooting with domain-specific SSL checks
 ./scripts/troubleshoot.sh example.com
+
+# Clean up generated files older than 7 days (default)
+./scripts/cleanup-generated.sh
+
+# Clean up files older than 3 days
+./scripts/cleanup-generated.sh -d 3
+
+# Clean up if total size exceeds 500MB
+./scripts/cleanup-generated.sh -s 500M
+
+# Force cleanup without confirmation
+./scripts/cleanup-generated.sh -d 1 -f
+```
+
+### Maintenance
+
+**Generated Files Cleanup**: The application generates PNG graph files in `app/static/generated/` for each DNS analysis. These files can accumulate over time. Use the cleanup script periodically:
+
+```bash
+# Weekly cleanup (recommended)
+./scripts/cleanup-generated.sh -d 7
+
+# Or set up a cron job for automatic cleanup
+# Add to crontab: 0 2 * * 0 /path/to/dns_by_eye/scripts/cleanup-generated.sh -d 7 -f
 ```
 
 ## Development
