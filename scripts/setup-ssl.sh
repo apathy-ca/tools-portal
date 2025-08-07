@@ -146,14 +146,6 @@ http {
         ssl_session_cache shared:SSL:10m;
         ssl_session_timeout 10m;
 
-        # Serve static files directly from nginx
-        location /static/ {
-            alias /app/static/;
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-            try_files \$uri \$uri/ =404;
-        }
-
         # API endpoints with rate limiting
         location /api/ {
             limit_req zone=api burst=20 nodelay;
