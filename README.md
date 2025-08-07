@@ -147,6 +147,38 @@ Content-Type: application/json
 }
 ```
 
+### Example: Analyzing the Broken Test Domain
+Try the intentionally broken `test.apathy.ca` domain to see DNS By Eye's error handling capabilities:
+
+```bash
+# Analyze the broken test domain with verbose output
+curl -X POST "https://tools.apathy.ca/api/delegation" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "domain": "test.apathy.ca",
+       "verbose": true,
+       "dns_server": "system"
+     }'
+
+# Simple trace without visualizations
+curl "https://tools.apathy.ca/api/trace/test.apathy.ca?verbose=true&dns_server=8.8.8.8"
+
+# Compare broken domain with a working one
+curl -X POST "https://tools.apathy.ca/api/compare" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "domains": ["test.apathy.ca", "google.com"],
+       "verbose": true,
+       "dns_server": "1.1.1.1"
+     }'
+```
+
+This will demonstrate:
+- **Broken nameserver detection** (ns3.broken.example)
+- **Timeout handling** for unresponsive servers
+- **Visual error indicators** in generated graphs
+- **Partial delegation results** despite DNS failures
+
 ### Simple Trace (No Visualizations)
 ```http
 GET /api/trace/example.com?verbose=true&dns_server=8.8.8.8
