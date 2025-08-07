@@ -52,27 +52,47 @@ fi
 
 # Check if domain resolves to this server
 echo -e "${BLUE}Checking DNS resolution...${NC}"
-DOMAIN_IP=$(dig +short $DOMAIN | tail -n1)
-SERVER_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "Unable to determine")
+DOMAIN_IPV4=$(dig +short $DOMAIN A | tail -n1)
+DOMAIN_IPV6=$(dig +short $DOMAIN AAAA | tail -n1)
+SERVER_IPV4=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null || echo "")
+SERVER_IPV6=$(curl -s -6 ifconfig.me 2>/dev/null || curl -s -6 ipinfo.io/ip 2>/dev/null || echo "")
 
-if [ -z "$DOMAIN_IP" ]; then
-    echo -e "${RED}Warning: Domain $DOMAIN does not resolve to any IP${NC}"
+# Check if domain has any IP records
+if [ -z "$DOMAIN_IPV4" ] && [ -z "$DOMAIN_IPV6" ]; then
+    echo -e "${RED}Warning: Domain $DOMAIN does not resolve to any IP address${NC}"
     echo "Please ensure your domain points to this server before continuing."
     read -p "Continue anyway? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
-elif [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
-    echo -e "${YELLOW}Warning: Domain resolves to $DOMAIN_IP but server IP is $SERVER_IP${NC}"
-    echo "SSL certificate generation may fail if domain doesn't point to this server."
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
 else
-    echo -e "${GREEN}✓ DNS resolution looks correct${NC}"
+    # Check if domain resolves to this server (IPv4 or IPv6)
+    MATCH_FOUND=false
+    
+    if [ -n "$DOMAIN_IPV4" ] && [ -n "$SERVER_IPV4" ] && [ "$DOMAIN_IPV4" = "$SERVER_IPV4" ]; then
+        echo -e "${GREEN}✓ Domain resolves to this server's IPv4 address ($DOMAIN_IPV4)${NC}"
+        MATCH_FOUND=true
+    fi
+    
+    if [ -n "$DOMAIN_IPV6" ] && [ -n "$SERVER_IPV6" ] && [ "$DOMAIN_IPV6" = "$SERVER_IPV6" ]; then
+        echo -e "${GREEN}✓ Domain resolves to this server's IPv6 address ($DOMAIN_IPV6)${NC}"
+        MATCH_FOUND=true
+    fi
+    
+    if [ "$MATCH_FOUND" = false ]; then
+        echo -e "${YELLOW}Warning: Domain DNS records don't match this server's IP addresses${NC}"
+        [ -n "$DOMAIN_IPV4" ] && echo "  Domain IPv4: $DOMAIN_IPV4"
+        [ -n "$DOMAIN_IPV6" ] && echo "  Domain IPv6: $DOMAIN_IPV6"
+        [ -n "$SERVER_IPV4" ] && echo "  Server IPv4: $SERVER_IPV4"
+        [ -n "$SERVER_IPV6" ] && echo "  Server IPv6: $SERVER_IPV6"
+        echo "SSL certificate generation may fail if domain doesn't point to this server."
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
 fi
 
 # Stop existing services
