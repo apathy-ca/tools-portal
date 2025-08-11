@@ -32,12 +32,12 @@ cache = Cache(app)
 
 # Enhanced rate limiting with IP tracking
 limiter = Limiter(
-    app,
     key_func=get_remote_address,
     default_limits=[Config.RATELIMIT_DEFAULT],
     storage_uri=Config.RATELIMIT_STORAGE_URL,
     strategy=Config.RATELIMIT_STRATEGY
 )
+limiter.init_app(app)
 
 # Configure logging with enhanced security
 import sys
