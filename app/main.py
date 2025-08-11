@@ -331,6 +331,7 @@ def get_dns_servers():
 
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_API_DEFAULT)
+@cache.cached(timeout=0)  # Disable caching to ensure fresh results
 def api_delegation():
     """API endpoint for DNS delegation analysis with visualizations."""
     try:
