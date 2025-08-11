@@ -375,17 +375,19 @@ def api_delegation():
                 for ns in cross_ref_results:
                     if isinstance(cross_ref_results[ns], dict):
                         refs = cross_ref_results[ns].get('references', [])
-                        # Add self-reference if present
-                        if ns in refs:
-                            dot.edge(ns, ns, color='green', label='self-ref', dir='both')
                         # Add references to other nameservers
                         for ref in refs:
-                            if ref != ns:  # Skip self-references as they're handled above
+                            if ref == ns:  # Self-reference
+                                dot.attr('edge', dir='both', color='green', label='self-ref')
+                                dot.edge(ns, ns)
+                                dot.attr('edge', dir='forward', color='black', label='')  # Reset edge attributes
+                            elif ref in cross_ref_results:  # Only draw edges to known nameservers
                                 # Check if there's a mutual reference
-                                if isinstance(cross_ref_results[ref], dict) and ns in cross_ref_results[ref].get('references', []):
-                                    # Only add one edge for mutual references
-                                    if ns < ref:  # Use alphabetical order to ensure consistent edge creation
-                                        dot.edge(ns, ref, color='blue', dir='both', label='mutual')
+                                if ns in cross_ref_results[ref].get('references', []):
+                                    if ns < ref:  # Only draw mutual edge once
+                                        dot.attr('edge', dir='both', color='blue', label='mutual')
+                                        dot.edge(ns, ref)
+                                        dot.attr('edge', dir='forward', color='black', label='')  # Reset edge attributes
                                 else:
                                     dot.edge(ns, ref, color='blue')
                 
@@ -801,15 +803,16 @@ def test_last_level_ns_references(nameservers, domain):
     # Convert sets to lists for JSON serialization and ensure all nameservers are included
     for ns in nameservers:
         if isinstance(results.get(ns), dict):
-            results[ns]['references'] = sorted(list(results[ns]['references']))
+            refs = sorted(list(results[ns]['references']))
+            results[ns]['references'] = refs
             # Add self-reference indicator
-            results[ns]['self_reference'] = ns in results[ns]['references']
+            results[ns]['self_reference'] = any(ref.rstrip('.') == ns.rstrip('.') for ref in refs)
             # Add mutual reference indicators
             results[ns]['mutual_references'] = [
-                ref for ref in results[ns]['references']
+                ref for ref in refs
                 if ref in nameservers and 
                    isinstance(results.get(ref), dict) and
-                   ns in results[ref]['references']
+                   any(r.rstrip('.') == ns.rstrip('.') for r in results[ref]['references'])
             ]
         else:
             results[ns] = {'references': [], 'error': str(results.get(ns, 'Unknown error'))}
