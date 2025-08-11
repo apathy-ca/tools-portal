@@ -288,8 +288,10 @@ def health_check():
 
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_API_DEFAULT)
-@cache.memoize(timeout=300)
+@cache.memoize(timeout=300, unless=lambda: not Config.ENABLE_CACHING)
 def api_delegation():
+    # Create a cache key based on all relevant parameters
+    cache_key = f"{request.json.get('domain')}:{request.json.get('dns_server')}:{request.json.get('verbose')}:{request.json.get('check_glue')}"
     """API endpoint for DNS delegation analysis with visualizations."""
     try:
         # Validate request body
