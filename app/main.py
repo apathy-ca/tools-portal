@@ -365,29 +365,28 @@ def api_delegation():
                 dot.node(domain, domain, shape='box', style='filled', fillcolor='lightblue')
                 
                 # Add nodes for each nameserver
-                for ns in cross_ref_results:
-                    if isinstance(cross_ref_results[ns], dict):
-                        dot.node(ns, ns)
-                        # Add edge from domain to nameserver
+                ns_count = len(cross_ref_results)
+                for i, (ns, info) in enumerate(cross_ref_results.items()):
+                    if isinstance(info, dict):
+                        # Condense large sets of nameservers
+                        if ns_count > 4 and i == 3 and domain != chain[-1]:
+                            dot.node(f"more_{ns_count-3}", f"... ({ns_count-3} more)", shape='ellipse', style='filled', fillcolor='lightgray')
+                            dot.edge(domain, f"more_{ns_count-3}")
+                            break
+                        color = 'lightgreen' if info.get('self_reference') else 'lightyellow'
+                        dot.node(ns, ns, style='filled', fillcolor=color)
                         dot.edge(domain, ns)
                 
-                # Add edges for references in a second pass to ensure all nodes exist
-                for ns in cross_ref_results:
-                    if isinstance(cross_ref_results[ns], dict):
-                        refs = cross_ref_results[ns].get('references', [])
-                        # Add references to other nameservers
+                # Add edges for references
+                for ns, info in cross_ref_results.items():
+                    if isinstance(info, dict):
+                        refs = info.get('references', [])
                         for ref in refs:
                             if ref == ns:  # Self-reference
-                                dot.attr('edge', dir='both', color='green', label='self-ref')
-                                dot.edge(ns, ns)
-                                dot.attr('edge', dir='forward', color='black', label='')  # Reset edge attributes
-                            elif ref in cross_ref_results:  # Only draw edges to known nameservers
-                                # Check if there's a mutual reference
+                                dot.edge(ns, ns, dir='both', color='green', label='self-ref')
+                            elif ref in cross_ref_results:
                                 if ns in cross_ref_results[ref].get('references', []):
-                                    if ns < ref:  # Only draw mutual edge once
-                                        dot.attr('edge', dir='both', color='blue', label='mutual')
-                                        dot.edge(ns, ref)
-                                        dot.attr('edge', dir='forward', color='black', label='')  # Reset edge attributes
+                                    dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
                                 else:
                                     dot.edge(ns, ref, color='blue')
                 
@@ -397,6 +396,37 @@ def api_delegation():
                 domain_report_graph_url = url_for('static', filename=f'generated/{filename}.png')
             except Exception as e:
                 app.logger.error(f"Error generating Domain Report graph: {e}")
+        
+        # Generate Glue Analysis graph
+        glue_analysis_graph_url = None
+        if glue_results:
+            try:
+                dot = Digraph(comment=f'Glue Analysis for {domain}')
+                dot.attr(rankdir='TB')  # Top->down layout
+                
+                for zone, data in glue_results.items():
+                    dot.node(zone, zone, shape='box', style='filled', fillcolor='lightblue')
+                    for ns, ns_data in data.get('glue_records', {}).items():
+                        color = 'lightgreen' if ns_data.get('glue_matches_resolution') else 'lightcoral'
+                        dot.node(ns, ns, style='filled', fillcolor=color)
+                        dot.edge(zone, ns)
+                        
+                        if ns_data.get('glue_a_records'):
+                            for ip in ns_data['glue_a_records']:
+                                dot.node(ip, ip, shape='ellipse')
+                                dot.edge(ns, ip, color='blue')
+                        
+                        if ns_data.get('glue_aaaa_records'):
+                            for ip in ns_data['glue_aaaa_records']:
+                                dot.node(ip, ip, shape='ellipse')
+                                dot.edge(ns, ip, color='green')
+                
+                # Save graph
+                filename = f"{domain.replace('.', '_')}_glue_analysis"
+                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
+                glue_analysis_graph_url = url_for('static', filename=f'generated/{filename}.png')
+            except Exception as e:
+                app.logger.error(f"Error generating Glue Analysis graph: {e}")
         
         return jsonify({
             'domain': domain,
@@ -408,7 +438,8 @@ def api_delegation():
             'cross_ref_results': cross_ref_results,
             'health_score': calculate_health_score(trace, glue_results, cross_ref_results),
             'graph_urls': graph_urls,
-            'domain_report_graph_url': domain_report_graph_url
+            'domain_report_graph_url': domain_report_graph_url,
+            'glue_analysis_graph_url': glue_analysis_graph_url
         })
     except Exception as e:
         app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")
