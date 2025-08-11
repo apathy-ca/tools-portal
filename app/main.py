@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response
+from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response, session
 import dns.resolver
 import dns.message
 import dns.query
@@ -16,6 +16,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_compress import Compress
 from config import Config
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
@@ -23,14 +25,58 @@ app.config.from_object(Config)
 # Initialize compression
 compress = Compress(app)
 
-# Configure simple in-memory cache
-app.config['CACHE_TYPE'] = 'SimpleCache'
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+# Configure cache
 cache = Cache(app)
-limiter = Limiter(app, key_func=get_remote_address, default_limits=[Config.RATELIMIT_DEFAULT])
+
+# Enhanced rate limiting
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=[Config.RATELIMIT_DEFAULT],
+    storage_uri=Config.RATELIMIT_STORAGE_URL,
+    strategy=Config.RATELIMIT_STRATEGY
+)
+
+# Configure logging
+if not app.debug:
+    file_handler = RotatingFileHandler(Config.LOG_FILE, maxBytes=Config.LOG_MAX_BYTES, backupCount=Config.LOG_BACKUP_COUNT)
+    file_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('DNS By Eye startup')
+
+# Cache key generation function
+def make_cache_key(*args, **kwargs):
+    path = request.path
+    args = str(hash(frozenset(request.args.items())))
+    return (Config.CACHE_KEY_PREFIX + path + args).encode('utf-8')
+
+# Request validation middleware
+@app.before_request
+def validate_request():
+    if request.method == 'POST' and not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 415
+    if request.content_length and request.content_length > Config.MAX_CONTENT_LENGTH:
+        return jsonify({'error': 'Request too large'}), 413
+
+# Error handling
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'error': 'An unexpected error occurred'}), 500
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({'error': 'Rate limit exceeded', 'description': e.description}), 429
 
 @app.after_request
-def add_csp_header(response):
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
     return response
 
 # Configure DNS resolver with timeouts
@@ -41,9 +87,28 @@ resolver.lifetime = Config.DNS_LIFETIME
 # DNS timeout constant for direct queries
 DNS_TIMEOUT = Config.DNS_TIMEOUT
 
-DOMAIN_REGEX = re.compile(r'^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$')
+# Input validation constants
+DOMAIN_REGEX = re.compile(r'^(?=.{4,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-_]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+IP_REGEX = re.compile(r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
+MAX_DOMAIN_LENGTH = 253
+MAX_DNS_SERVERS = ['system', '8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '9.9.9.9', '208.67.222.222', '208.67.220.220']
+
 def is_valid_domain(domain):
-    return bool(DOMAIN_REGEX.match(domain.strip('.')))
+    """Validate domain name format and length."""
+    if not domain or len(domain) > MAX_DOMAIN_LENGTH:
+        return False
+    try:
+        return bool(DOMAIN_REGEX.match(domain.strip('.')))
+    except Exception:
+        return False
+
+def is_valid_dns_server(dns_server):
+    """Validate DNS server is either 'system' or a valid IP from our allowed list."""
+    if not dns_server:
+        return False
+    if dns_server == 'system':
+        return True
+    return dns_server in MAX_DNS_SERVERS and bool(IP_REGEX.match(dns_server))
 
 def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
     """
@@ -752,20 +817,33 @@ def static_files(filename):
     return send_from_directory(app.static_folder, filename)
 
 @app.route('/api/delegation', methods=['POST'])
-@limiter.limit(Config.RATELIMIT_DEFAULT)
+@limiter.limit(Config.RATELIMIT_API_DEFAULT)
+@cache.memoize(timeout=300)
 def api_delegation():
-    app.logger.info(f"Received delegation request for domain: {request.json.get('domain')}")
-    data = request.get_json()
-    domain = data.get('domain', '')
-    verbose = data.get('verbose', False)
-    dns_server = data.get('dns_server', 'system')
-    check_glue = data.get('check_glue', True)  # Enable glue record checking by default
-    prefix = hashlib.sha256(f"{domain}_{verbose}_{dns_server}".encode()).hexdigest()
-    
-    if not is_valid_domain(domain):
-        return jsonify({'error': 'Invalid domain format'}), 400
-    
+    """API endpoint for DNS delegation analysis with visualizations."""
     try:
+        # Validate request body
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Missing request body'}), 400
+            
+        # Input validation
+        domain = data.get('domain', '').strip().lower()
+        if not domain:
+            return jsonify({'error': 'Domain is required'}), 400
+        if not is_valid_domain(domain):
+            return jsonify({'error': 'Invalid domain format'}), 400
+            
+        dns_server = data.get('dns_server', 'system')
+        if not is_valid_dns_server(dns_server):
+            return jsonify({'error': 'Invalid DNS server'}), 400
+            
+        verbose = bool(data.get('verbose', False))
+        check_glue = bool(data.get('check_glue', True))
+        
+        app.logger.info(f"Received delegation request for domain: {domain}")
+        prefix = hashlib.sha256(f"{domain}_{verbose}_{dns_server}".encode()).hexdigest()
+        
         # Create custom resolver if specified
         custom_resolver = create_custom_resolver(dns_server)
         trace, chain, _ = trace_delegation(domain, verbose=verbose, custom_resolver=custom_resolver)
@@ -818,6 +896,7 @@ def api_delegation():
             'dns_server_used': dns_server
         })
     except Exception as e:
+        app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/trace/<domain>', methods=['GET'])
@@ -894,7 +973,7 @@ def api_dns_servers():
     return jsonify(dns_servers)
 
 @app.route('/api/export/<domain>', methods=['GET'])
-@limiter.limit(Config.RATELIMIT_DEFAULT)
+@limiter.limit(Config.RATELIMIT_API_EXPORT)
 def api_export(domain):
     """Export DNS delegation analysis data in JSON or CSV format."""
     format_type = request.args.get('format', 'json').lower()
@@ -1013,7 +1092,7 @@ def api_compare():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/debug/<domain>', methods=['GET'])
-@limiter.limit(Config.RATELIMIT_DEFAULT)
+@limiter.limit(Config.RATELIMIT_API_DEBUG)
 def api_debug(domain):
     """Get detailed debug information for DNS delegation trace."""
     verbose = request.args.get('verbose', 'false').lower() == 'true'
