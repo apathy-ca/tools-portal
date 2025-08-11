@@ -151,20 +151,35 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
     
     # Check glue records
     if glue_results:
-        # Count all glue record issues including unnecessary glue records
-        glue_issues = 0
-        for zone in glue_results.values():
-            glue_issues += len(zone.get('glue_issues', []))
+        # Count major and minor glue record issues
+        major_glue_issues = 0
+        minor_glue_issues = 0
         
-        if glue_issues == 0:
+        for zone in glue_results.values():
+            for issue in zone.get('glue_issues', []):
+                if "Missing glue" in issue or "don't match" in issue:
+                    major_glue_issues += 1
+                else:
+                    minor_glue_issues += 1
+        
+        total_glue_issues = major_glue_issues + minor_glue_issues
+        
+        if total_glue_issues == 0:
             score += weights['glue']
             breakdown.append("+" + str(weights['glue']) + " points: All glue records are correct")
         else:
-            deduction = min(glue_issues * 0.5, weights['glue'])
+            # Major issues: -1 point each, Minor issues: -0.25 points each
+            deduction = major_glue_issues * 1.0 + minor_glue_issues * 0.25
             remaining_points = max(0, weights['glue'] - deduction)
             score += remaining_points
-            issue_text = "issue" if glue_issues == 1 else "issues"
-            breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(glue_issues) + " glue record " + issue_text + " found")
+            
+            breakdown.append("+" + str(round(remaining_points, 1)) + " points: Glue records (after penalties)")
+            if major_glue_issues > 0:
+                issue_text = "issue" if major_glue_issues == 1 else "issues"
+                breakdown.append("  • -" + str(round(major_glue_issues * 1.0, 1)) + " points: " + str(major_glue_issues) + " major glue " + issue_text)
+            if minor_glue_issues > 0:
+                issue_text = "issue" if minor_glue_issues == 1 else "issues"
+                breakdown.append("  • -" + str(round(minor_glue_issues * 0.25, 1)) + " points: " + str(minor_glue_issues) + " minor glue " + issue_text)
     
     # Check cross-reference consistency and nameserver health
     if cross_ref_results:
@@ -191,29 +206,25 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             score += weights['crossRef']
             breakdown.append("+" + str(weights['crossRef']) + " points: All nameserver references are consistent")
         else:
-            # Heavy penalty for broken nameservers - each broken nameserver costs 1.0 point
-            # Inconsistencies cost 0.5 points each
-            deduction = broken_nameservers * 1.0 + inconsistencies * 0.5
+            # Major issues: -1 point each (broken nameservers), Minor issues: -0.25 points each (inconsistencies)
+            deduction = broken_nameservers * 1.0 + inconsistencies * 0.25
             remaining_points = max(0, weights['crossRef'] - deduction)
             score += remaining_points
             
+            breakdown.append("+" + str(round(remaining_points, 1)) + " points: Nameserver references (after penalties)")
             if broken_nameservers > 0:
                 ns_text = "nameserver" if broken_nameservers == 1 else "nameservers"
-                breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text + " found")
+                breakdown.append("  • -" + str(round(broken_nameservers * 1.0, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text)
                 # Add specific broken nameserver details
                 broken_details = [detail for detail in inconsistency_details if ": " in detail]
                 for detail in broken_details[:3]:  # Show first 3 broken nameserver issues
-                    breakdown.append("  • " + detail)
+                    breakdown.append("    ◦ " + detail)
                 if len(broken_details) > 3:
-                    breakdown.append("  • ... and " + str(len(broken_details) - 3) + " more")
-                
-                # Also show inconsistencies if any
-                if inconsistencies > 0:
-                    ref_text = "reference" if inconsistencies == 1 else "references"
-                    breakdown.append("  • " + str(inconsistencies) + " additional inconsistent nameserver " + ref_text)
-            elif inconsistencies > 0:
+                    breakdown.append("    ◦ ... and " + str(len(broken_details) - 3) + " more")
+            
+            if inconsistencies > 0:
                 ref_text = "reference" if inconsistencies == 1 else "references"
-                breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
+                breakdown.append("  • -" + str(round(inconsistencies * 0.25, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text)
     
     # Normalize score to be out of 10
     max_score = 10
