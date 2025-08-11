@@ -13,6 +13,7 @@ class Config:
     CACHE_DEFAULT_TIMEOUT = int(os.environ.get('CACHE_DEFAULT_TIMEOUT', '300'))
     CACHE_KEY_PREFIX = 'dns_by_eye_'
     CACHE_THRESHOLD = 1000  # Maximum number of items in cache
+    ENABLE_CACHING = os.environ.get('ENABLE_CACHING', 'true').lower() == 'true'
 
     # DNS resolver timeouts
     DNS_TIMEOUT = float(os.environ.get('DNS_TIMEOUT', '2'))

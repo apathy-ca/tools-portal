@@ -286,6 +286,15 @@ def health_check():
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
     })
 
+@app.route('/api/dns-servers', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def get_dns_servers():
+    """Get list of available DNS servers."""
+    return jsonify({
+        'dns_servers': MAX_DNS_SERVERS,
+        'default': 'system'
+    })
+
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_API_DEFAULT)
 @cache.memoize(timeout=300, unless=lambda: not Config.ENABLE_CACHING)
