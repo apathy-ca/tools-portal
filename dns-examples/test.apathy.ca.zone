@@ -24,7 +24,7 @@ ns1     IN      A       97.107.131.151          ; Working nameserver
 ns2     IN      A       192.0.2.2               ; Correct glue record
 ns2     IN      A       192.0.2.3               ; Incorrect additional glue record (mismatch)
 ; ns3 has no A record (missing glue)
-; ns4 has no A record (another missing glue)
+ns4     IN      A       97.107.131.152          ; Added A record to fix zone loading
 
 ; AAAA records for IPv6 (partial coverage)
 ns1     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d  ; Working IPv6
@@ -34,7 +34,7 @@ ns1     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d  ; Working IPv6
 ; - ns1: Correct A and AAAA records
 ; - ns2: Correct A record, but with an additional incorrect A record
 ; - ns3: Missing A record (broken glue)
-; - ns4: Missing A record (another broken glue)
+; - ns4: Has A record but missing AAAA record
 ; - All nameservers except ns1 are missing AAAA records
 
 ; Some test records
