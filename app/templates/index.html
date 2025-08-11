@@ -388,14 +388,34 @@ if __name__ == "__main__":
             for (const [zone, zoneData] of Object.entries(glueResults)) {
                 if (zoneData.status === 'success' && zoneData.nameservers.length > 0) {
                     const hasIssues = zoneData.glue_issues && zoneData.glue_issues.length > 0;
-                    const borderColor = hasIssues ? '#dc3545' : '#28a745';
-                    const bgColor = hasIssues ? '#f8d7da' : '#d4edda';
+                    // Determine if there are any serious issues vs warnings
+                    const hasErrors = zoneData.glue_issues && zoneData.glue_issues.some(issue => 
+                        issue.includes('Missing glue') || issue.includes("don't match")
+                    );
+                    
+                    let borderColor, bgColor, textColor;
+                    if (hasErrors) {
+                        // Red for serious problems
+                        borderColor = '#dc3545';
+                        bgColor = '#f8d7da';
+                        textColor = '#721c24';
+                    } else if (hasIssues) {
+                        // Yellow for warnings
+                        borderColor = '#ffc107';
+                        bgColor = '#fff3cd';
+                        textColor = '#856404';
+                    } else {
+                        // Green for good
+                        borderColor = '#28a745';
+                        bgColor = '#d4edda';
+                        textColor = '#155724';
+                    }
                     
                     html += `<div style="border: 1px solid ${borderColor}; border-radius: 4px; margin: 10px 0; background: ${bgColor};">
                                 <div style="padding: 10px; border-bottom: 1px solid ${borderColor};">
-                                    <h4 style="margin: 0; color: ${hasIssues ? '#721c24' : '#155724'};">
+                                    <h4 style="margin: 0; color: ${textColor};">
                                         ${zone === '.' ? 'Root Zone (.)' : zone}
-                                        ${hasIssues ? ' ⚠️' : ' ✅'}
+                                        ${hasErrors ? ' ❌' : hasIssues ? ' ⚠️' : ' ✅'}
                                     </h4>
                                 </div>
                                 <div style="padding: 10px;">`;

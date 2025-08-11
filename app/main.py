@@ -353,7 +353,7 @@ def check_glue_records(domain, custom_resolver=None):
     
     glue_results = {}
     
-    for zone in chain:
+    for i, zone in enumerate(chain):
         zone_result = {
             'zone': zone,
             'nameservers': [],
@@ -361,6 +361,13 @@ def check_glue_records(domain, custom_resolver=None):
             'glue_issues': [],
             'status': 'unknown'
         }
+        
+        # Skip glue record checking for root (.) and TLD zones (first two levels)
+        if i <= 1:  # 0 = root, 1 = TLD
+            zone_result['status'] = 'skipped'
+            zone_result['glue_issues'].append(f"Glue record checking skipped for {zone} (root/TLD level)")
+            glue_results[zone] = zone_result
+            continue
         
         try:
             # Get NS records for this zone
@@ -578,9 +585,10 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None, glue_data
     Includes a node for the domain pointing to its nameservers.
     Handles broken/unreachable nameservers gracefully.
     Enhanced with glue record information when available.
+    Layout similar to domain delegation graphs with domain at top, nameservers below.
     """
     dot = Digraph(format='png')
-    dot.attr(rankdir='LR')
+    dot.attr(rankdir='TB')  # Top to bottom like domain graphs
     # Show the domain being looked up prominently in the title
     title = f'Cross-Reference Analysis for: {domain}' if domain else 'Last Level Nameserver Cross-Reference'
     dot.attr(label=title, labelloc='t', fontsize='20')
