@@ -618,7 +618,9 @@ if __name__ == "__main__":
                             html += `<div><strong>Expected Glue:</strong> ${nsData.expected_glue ? 'Yes (in-zone nameserver)' : 'No (out-of-zone nameserver)'}</div>`;
                             
                             // Parent zone glue record status
-                            html += `<div style="margin-top:8px;"><strong>Glue Records from Parent Zone:</strong></div>`;
+                            const parentZone = zone === '.' ? 'Root Servers' : 
+                                             zone.includes('.') ? zone.substring(zone.indexOf('.') + 1) : 'TLD';
+                            html += `<div style="margin-top:8px;"><strong>Glue Records from Parent Zone (${parentZone}):</strong></div>`;
                             html += `<div style="margin-left:15px;">
                                 <div><strong>Has A Record:</strong> ${nsData.has_glue_a ? 'Yes' : 'No'}</div>
                                 <div><strong>Has AAAA Record:</strong> ${nsData.has_glue_aaaa ? 'Yes' : 'No'}</div>
@@ -629,7 +631,7 @@ if __name__ == "__main__":
                             html += `<table style="margin-left:15px; border-collapse:collapse; width:calc(100% - 15px);">
                                 <tr style="background:#f8f9fa;">
                                     <th style="text-align:left; padding:4px;">Record Type</th>
-                                    <th style="text-align:left; padding:4px;">Parent Zone Glue</th>
+                                    <th style="text-align:left; padding:4px;">Parent Zone (${parentZone}) Glue</th>
                                     <th style="text-align:left; padding:4px;">Actual Resolution</th>
                                 </tr>`;
                             
