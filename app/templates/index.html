@@ -52,6 +52,10 @@
             <input type="checkbox" id="debugCheckbox">
             Debug mode
         </label>
+        <label>
+            <input type="checkbox" id="glueCheckbox" checked>
+            Check glue records
+        </label>
         <button type="button" id="shareUrlBtn" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
             🔗 Share URL
         </button>
@@ -364,12 +368,123 @@ if __name__ == "__main__":
             }
         }
 
+        function renderGlueRecords(glueResults, verbose) {
+            let html = `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top:2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                           <details>
+                               <summary style="cursor: pointer; font-weight: bold; color: #666;">🔗 Glue Record Analysis</summary>
+                               <div style="margin-top: 15px;">`;
+            
+            // Summary statistics
+            const totalZones = Object.keys(glueResults).length;
+            const zonesWithIssues = Object.values(glueResults).filter(zone => zone.glue_issues && zone.glue_issues.length > 0).length;
+            const totalNameservers = Object.values(glueResults).reduce((sum, zone) => sum + zone.nameservers.length, 0);
+            const nameserversWithIssues = Object.values(glueResults).reduce((sum, zone) => {
+                return sum + Object.values(zone.glue_records || {}).filter(ns => ns.issues && ns.issues.length > 0).length;
+            }, 0);
+            
+            html += `<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0;">Summary</h4>
+                        <p style="margin: 5px 0;"><strong>Total Zones:</strong> ${totalZones}</p>
+                        <p style="margin: 5px 0;"><strong>Zones with Issues:</strong> ${zonesWithIssues}</p>
+                        <p style="margin: 5px 0;"><strong>Total Nameservers:</strong> ${totalNameservers}</p>
+                        <p style="margin: 5px 0;"><strong>Nameservers with Issues:</strong> ${nameserversWithIssues}</p>
+                     </div>`;
+            
+            // Detailed results for each zone
+            for (const [zone, zoneData] of Object.entries(glueResults)) {
+                if (zoneData.status === 'success' && zoneData.nameservers.length > 0) {
+                    const hasIssues = zoneData.glue_issues && zoneData.glue_issues.length > 0;
+                    const borderColor = hasIssues ? '#dc3545' : '#28a745';
+                    const bgColor = hasIssues ? '#f8d7da' : '#d4edda';
+                    
+                    html += `<div style="border: 1px solid ${borderColor}; border-radius: 4px; margin: 10px 0; background: ${bgColor};">
+                                <div style="padding: 10px; border-bottom: 1px solid ${borderColor};">
+                                    <h4 style="margin: 0; color: ${hasIssues ? '#721c24' : '#155724'};">
+                                        ${zone === '.' ? 'Root Zone (.)' : zone}
+                                        ${hasIssues ? ' ⚠️' : ' ✅'}
+                                    </h4>
+                                </div>
+                                <div style="padding: 10px;">`;
+                    
+                    // Zone-level issues
+                    if (zoneData.glue_issues && zoneData.glue_issues.length > 0) {
+                        html += `<div style="margin-bottom: 10px;">
+                                    <strong style="color: #721c24;">Zone Issues:</strong>
+                                    <ul style="margin: 5px 0; padding-left: 20px;">`;
+                        zoneData.glue_issues.forEach(issue => {
+                            html += `<li style="color: #721c24;">${issue}</li>`;
+                        });
+                        html += `</ul></div>`;
+                    }
+                    
+                    // Nameserver details
+                    if (zoneData.glue_records && Object.keys(zoneData.glue_records).length > 0) {
+                        html += `<div><strong>Nameserver Details:</strong></div>`;
+                        for (const [ns, nsData] of Object.entries(zoneData.glue_records)) {
+                            const nsHasIssues = nsData.issues && nsData.issues.length > 0;
+                            const nsColor = nsHasIssues ? '#721c24' : '#155724';
+                            
+                            html += `<div style="margin: 10px 0; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: white;">
+                                        <div style="font-weight: bold; color: ${nsColor};">
+                                            ${ns} ${nsHasIssues ? '⚠️' : '✅'}
+                                        </div>
+                                        <div style="margin-top: 5px; font-size: 0.9em;">`;
+                            
+                            // Expected glue status
+                            html += `<div><strong>Expected Glue:</strong> ${nsData.expected_glue ? 'Yes (in-zone nameserver)' : 'No (out-of-zone nameserver)'}</div>`;
+                            
+                            // Glue record status
+                            html += `<div><strong>Has Glue A:</strong> ${nsData.has_glue_a ? 'Yes' : 'No'}</div>`;
+                            html += `<div><strong>Has Glue AAAA:</strong> ${nsData.has_glue_aaaa ? 'Yes' : 'No'}</div>`;
+                            
+                            // Show glue records if present
+                            if (nsData.glue_a_records && nsData.glue_a_records.length > 0) {
+                                html += `<div><strong>Glue A Records:</strong> ${nsData.glue_a_records.join(', ')}</div>`;
+                            }
+                            if (nsData.glue_aaaa_records && nsData.glue_aaaa_records.length > 0) {
+                                html += `<div><strong>Glue AAAA Records:</strong> ${nsData.glue_aaaa_records.join(', ')}</div>`;
+                            }
+                            
+                            // Show resolved records for comparison
+                            if (nsData.resolved_a_records && nsData.resolved_a_records.length > 0) {
+                                html += `<div><strong>Resolved A Records:</strong> ${nsData.resolved_a_records.join(', ')}</div>`;
+                            }
+                            if (nsData.resolved_aaaa_records && nsData.resolved_aaaa_records.length > 0) {
+                                html += `<div><strong>Resolved AAAA Records:</strong> ${nsData.resolved_aaaa_records.join(', ')}</div>`;
+                            }
+                            
+                            // Show match status
+                            html += `<div><strong>Glue Matches Resolution:</strong> ${nsData.glue_matches_resolution ? 'Yes' : 'No'}</div>`;
+                            
+                            // Show issues if any
+                            if (nsData.issues && nsData.issues.length > 0) {
+                                html += `<div style="margin-top: 5px;"><strong style="color: #721c24;">Issues:</strong>
+                                            <ul style="margin: 5px 0; padding-left: 20px;">`;
+                                nsData.issues.forEach(issue => {
+                                    html += `<li style="color: #721c24;">${issue}</li>`;
+                                });
+                                html += `</ul></div>`;
+                            }
+                            
+                            html += `</div></div>`;
+                        }
+                    }
+                    
+                    html += `</div></div>`;
+                }
+            }
+            
+            html += `</div></details></div>`;
+            return html;
+        }
+
         document.getElementById('domainForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const domainInput = document.getElementById('domainInput').value.trim();
             const domains = domainInput.split('\n').map(d => d.trim()).filter(d => d);
             const verbose = document.getElementById('verboseCheckbox').checked;
             const debug = document.getElementById('debugCheckbox').checked;
+            const check_glue = document.getElementById('glueCheckbox').checked;
             const dns_server = document.getElementById('dnsServerSelect').value;
             
             if (domains.length === 0) {
@@ -393,7 +508,7 @@ if __name__ == "__main__":
                     resp = await fetch('/api/delegation', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ domain: domains[0], verbose, dns_server })
+                        body: JSON.stringify({ domain: domains[0], verbose, dns_server, check_glue })
                     });
                     data = await resp.json();
                 } catch (err) {
@@ -464,6 +579,11 @@ if __name__ == "__main__":
                                      <span style="margin-left: 15px;">AAAA: ${aaaaRecords.join(', ')}</span></li>`;
                         }
                         html += `</ul></details></div>`;
+                    }
+                    
+                    // Show glue record results if any
+                    if (data.glue_results && Object.keys(data.glue_results).length > 0) {
+                        html += renderGlueRecords(data.glue_results, verbose);
                     }
                     
                     document.getElementById('graphviz').innerHTML = html;

@@ -5,6 +5,7 @@
 DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation chains from the root through TLDs to the authoritative nameservers, then renders interactive graphs of each layer and cross-reference diagrams. Features include:
 
 - **Resilient DNS tracing**: Gracefully handles broken nameservers and non-existent domains
+- **Glue record validation**: Comprehensive analysis of glue records across the delegation chain
 - **Multi-domain comparison**: Compare DNS delegation paths across multiple domains
 - **Response time monitoring**: Track DNS query performance with slow response indicators
 - **Interactive visualizations**: Graphviz-based PNG diagrams for each delegation layer
@@ -34,6 +35,15 @@ DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation 
 - **Partial results**: Provides useful information even when some nameservers are unreachable
 - **Broken nameserver support**: Handles misconfigured nameservers without complete failure
 - **Enhanced cross-reference analysis**: Color-coded nameservers based on reachability status
+
+### Glue Record Validation (New Feature)
+- **Comprehensive glue record analysis**: Checks glue records across the entire delegation chain
+- **In-zone vs out-of-zone detection**: Identifies when glue records are expected vs unnecessary
+- **Glue record consistency**: Verifies that glue records match actual DNS resolution
+- **Missing glue detection**: Identifies missing glue records for in-zone nameservers
+- **Unnecessary glue detection**: Flags unnecessary glue records for out-of-zone nameservers
+- **Additional section parsing**: Analyzes DNS response additional sections for glue records
+- **Visual glue record reporting**: Detailed UI display of glue record status and issues
 
 ### Technical Features
 - In-memory caching (Flask-Caching) with configurable TTL
@@ -205,6 +215,11 @@ GET /api/export/example.com?format=csv&verbose=true
 ### Debug Analysis
 ```http
 GET /api/debug/example.com?verbose=true&dns_server=8.8.8.8
+```
+
+### Glue Record Analysis
+```http
+GET /api/glue-records/example.com?dns_server=8.8.8.8
 ```
 
 ### Utility Endpoints

@@ -1,5 +1,8 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response
 import dns.resolver
+import dns.message
+import dns.query
+import dns.rdatatype
 import os
 from graphviz import Digraph
 import re
@@ -34,6 +37,9 @@ def add_csp_header(response):
 resolver = dns.resolver.Resolver()
 resolver.timeout = Config.DNS_TIMEOUT
 resolver.lifetime = Config.DNS_LIFETIME
+
+# DNS timeout constant for direct queries
+DNS_TIMEOUT = Config.DNS_TIMEOUT
 
 DOMAIN_REGEX = re.compile(r'^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$')
 def is_valid_domain(domain):
@@ -324,6 +330,159 @@ def build_all_layer_graphs(trace, domain, verbose=False, prefix=None):
         urls.append(url)
     return urls
 
+def check_glue_records(domain, custom_resolver=None):
+    """
+    Check glue records for all domains in the delegation chain.
+    This function performs comprehensive glue record validation by:
+    1. Getting NS records for each zone in the delegation chain
+    2. For each nameserver, checking if glue records (A/AAAA) are provided in the additional section
+    3. Verifying that the glue record IPs actually resolve to the nameserver names
+    4. Identifying missing, incorrect, or inconsistent glue records
+    
+    Returns a dict with detailed glue record analysis for each zone.
+    """
+    query_resolver = custom_resolver if custom_resolver else resolver
+    
+    # Build the delegation chain
+    labels = [label for label in domain.strip('.').split('.') if label]
+    reversed_labels = labels[::-1]
+    chain = ['.']
+    for i in range(len(reversed_labels)):
+        zone = '.'.join(reversed_labels[:i+1][::-1])
+        chain.append(zone)
+    
+    glue_results = {}
+    
+    for zone in chain:
+        zone_result = {
+            'zone': zone,
+            'nameservers': [],
+            'glue_records': {},
+            'glue_issues': [],
+            'status': 'unknown'
+        }
+        
+        try:
+            # Get NS records for this zone
+            ns_response = query_resolver.resolve(zone, 'NS')
+            ns_list = [r.to_text().rstrip('.') for r in ns_response]
+            zone_result['nameservers'] = ns_list
+            zone_result['status'] = 'success'
+            
+            # For each nameserver, check glue records
+            for ns in ns_list:
+                ns_glue = {
+                    'nameserver': ns,
+                    'expected_glue': False,
+                    'has_glue_a': False,
+                    'has_glue_aaaa': False,
+                    'glue_a_records': [],
+                    'glue_aaaa_records': [],
+                    'resolved_a_records': [],
+                    'resolved_aaaa_records': [],
+                    'glue_matches_resolution': True,
+                    'issues': []
+                }
+                
+                # Determine if glue records are expected
+                # Glue records are needed when the nameserver is within the zone being delegated
+                if zone != '.' and (ns.endswith('.' + zone) or ns == zone):
+                    ns_glue['expected_glue'] = True
+                
+                # Try to get the full DNS response with additional section
+                try:
+                    # Query one of the nameservers for this zone to get glue records
+                    if zone_result['nameservers']:
+                        # Try to find an IP for one of the nameservers to query
+                        query_target = None
+                        for test_ns in zone_result['nameservers']:
+                            try:
+                                test_ns_ips = query_resolver.resolve(test_ns, 'A')
+                                if test_ns_ips:
+                                    query_target = test_ns_ips[0].to_text()
+                                    break
+                            except:
+                                continue
+                        
+                        if query_target:
+                            # Create DNS message for NS query
+                            query_msg = dns.message.make_query(zone, 'NS')
+                            try:
+                                response = dns.query.udp(query_msg, query_target, timeout=DNS_TIMEOUT)
+                                
+                                # Check additional section for glue records
+                                for rr in response.additional:
+                                    if rr.name.to_text().rstrip('.') == ns:
+                                        if rr.rdtype == dns.rdatatype.A:
+                                            ns_glue['has_glue_a'] = True
+                                            for rd in rr:
+                                                ns_glue['glue_a_records'].append(rd.to_text())
+                                        elif rr.rdtype == dns.rdatatype.AAAA:
+                                            ns_glue['has_glue_aaaa'] = True
+                                            for rd in rr:
+                                                ns_glue['glue_aaaa_records'].append(rd.to_text())
+                            except:
+                                pass
+                
+                except Exception as e:
+                    ns_glue['issues'].append(f"Error checking glue records: {e}")
+                
+                # Get resolved A and AAAA records for comparison
+                try:
+                    a_records = query_resolver.resolve(ns, 'A')
+                    ns_glue['resolved_a_records'] = [r.to_text() for r in a_records]
+                except:
+                    pass
+                
+                try:
+                    aaaa_records = query_resolver.resolve(ns, 'AAAA')
+                    ns_glue['resolved_aaaa_records'] = [r.to_text() for r in aaaa_records]
+                except:
+                    pass
+                
+                # Check if glue records match resolved records
+                if ns_glue['glue_a_records'] and ns_glue['resolved_a_records']:
+                    if set(ns_glue['glue_a_records']) != set(ns_glue['resolved_a_records']):
+                        ns_glue['glue_matches_resolution'] = False
+                        ns_glue['issues'].append("Glue A records don't match resolved A records")
+                
+                if ns_glue['glue_aaaa_records'] and ns_glue['resolved_aaaa_records']:
+                    if set(ns_glue['glue_aaaa_records']) != set(ns_glue['resolved_aaaa_records']):
+                        ns_glue['glue_matches_resolution'] = False
+                        ns_glue['issues'].append("Glue AAAA records don't match resolved AAAA records")
+                
+                # Check for missing glue records when expected
+                if ns_glue['expected_glue']:
+                    if not ns_glue['has_glue_a'] and ns_glue['resolved_a_records']:
+                        ns_glue['issues'].append("Missing glue A records (expected for in-zone nameserver)")
+                    if not ns_glue['has_glue_aaaa'] and ns_glue['resolved_aaaa_records']:
+                        ns_glue['issues'].append("Missing glue AAAA records (expected for in-zone nameserver)")
+                
+                # Check for unnecessary glue records
+                if not ns_glue['expected_glue']:
+                    if ns_glue['has_glue_a'] or ns_glue['has_glue_aaaa']:
+                        ns_glue['issues'].append("Unnecessary glue records (nameserver is out-of-zone)")
+                
+                zone_result['glue_records'][ns] = ns_glue
+                
+                # Add issues to zone-level issues
+                if ns_glue['issues']:
+                    zone_result['glue_issues'].extend([f"{ns}: {issue}" for issue in ns_glue['issues']])
+            
+        except dns.resolver.NXDOMAIN:
+            zone_result['status'] = 'nxdomain'
+            zone_result['glue_issues'].append(f"Zone {zone} does not exist")
+        except dns.resolver.NoAnswer:
+            zone_result['status'] = 'no_ns'
+            zone_result['glue_issues'].append(f"No NS records found for {zone}")
+        except Exception as e:
+            zone_result['status'] = 'error'
+            zone_result['glue_issues'].append(f"Error querying {zone}: {e}")
+        
+        glue_results[zone] = zone_result
+    
+    return glue_results
+
 def test_last_level_ns_references(ns_list, domain):
     """
     Test what each nameserver thinks the NS records should be for the domain.
@@ -540,6 +699,7 @@ def api_delegation():
     domain = data.get('domain', '')
     verbose = data.get('verbose', False)
     dns_server = data.get('dns_server', 'system')
+    check_glue = data.get('check_glue', True)  # Enable glue record checking by default
     prefix = hashlib.sha256(f"{domain}_{verbose}_{dns_server}".encode()).hexdigest()
     
     if not is_valid_domain(domain):
@@ -554,6 +714,8 @@ def api_delegation():
 
         cross_ref_results = {}
         cross_ref_graph_url = None
+        glue_results = {}
+        
         if trace:
             # Filter out error nameservers more comprehensively
             last_level_ns = [ns for ns in trace[-1]['nameservers'] 
@@ -567,12 +729,22 @@ def api_delegation():
                     app.logger.warning(f"Cross-reference analysis failed for {domain}: {e}")
                     cross_ref_results = {}
                     cross_ref_graph_url = None
+        
+        # Check glue records if requested
+        if check_glue:
+            try:
+                glue_results = check_glue_records(domain, custom_resolver)
+            except Exception as e:
+                app.logger.warning(f"Glue record analysis failed for {domain}: {e}")
+                glue_results = {}
+        
         return jsonify({
             'trace': trace,
             'graph_urls': graph_urls,
             'chain': chain_str,
             'cross_ref_results': cross_ref_results,
             'cross_ref_graph_url': cross_ref_graph_url,
+            'glue_results': glue_results,
             'dns_server_used': dns_server
         })
     except Exception as e:
@@ -817,5 +989,42 @@ def api_debug(domain):
         
         return jsonify(debug_info)
         
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/glue-records/<domain>', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def api_glue_records(domain):
+    """API endpoint to check glue records for a domain."""
+    dns_server = request.args.get('dns_server', 'system')
+    
+    if not is_valid_domain(domain):
+        return jsonify({'error': 'Invalid domain format'}), 400
+    
+    try:
+        custom_resolver = create_custom_resolver(dns_server)
+        glue_results = check_glue_records(domain, custom_resolver)
+        
+        # Calculate summary statistics
+        total_zones = len(glue_results)
+        zones_with_issues = len([zone for zone, data in glue_results.items() if data['glue_issues']])
+        total_nameservers = sum([len(data['nameservers']) for data in glue_results.values()])
+        nameservers_with_issues = sum([
+            len([ns for ns, ns_data in data['glue_records'].items() if ns_data['issues']])
+            for data in glue_results.values()
+        ])
+        
+        return jsonify({
+            'domain': domain,
+            'dns_server_used': dns_server,
+            'glue_analysis': glue_results,
+            'summary': {
+                'total_zones': total_zones,
+                'zones_with_issues': zones_with_issues,
+                'total_nameservers': total_nameservers,
+                'nameservers_with_issues': nameservers_with_issues,
+                'analysis_timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC')
+            }
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
