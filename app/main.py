@@ -364,10 +364,11 @@ def check_glue_records(domain, custom_resolver=None):
             'status': 'unknown'
         }
         
-        # Skip glue record checking for root (.) and TLD zones (first two levels)
-        if i <= 1:  # 0 = root, 1 = TLD
+        # Skip glue record checking for root (.) zone only
+        # Check glue records for TLD → domain delegation (second-to-last level)
+        if i == 0:  # 0 = root only
             zone_result['status'] = 'skipped'
-            zone_result['glue_issues'].append(f"Glue record checking skipped for {zone} (root/TLD level)")
+            zone_result['glue_issues'].append(f"Glue record checking skipped for {zone} (root level)")
             glue_results[zone] = zone_result
             continue
         
