@@ -194,8 +194,9 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             score += weights['crossRef']
             breakdown.append("+" + str(weights['crossRef']) + " points: All nameserver references are consistent")
         else:
-            # Heavy penalty for broken nameservers
-            deduction = min(broken_nameservers * 1.0 + inconsistencies * 0.5, weights['crossRef'])
+            # Heavy penalty for broken nameservers - each broken nameserver costs 1.0 point
+            # Inconsistencies cost 0.5 points each
+            deduction = broken_nameservers * 1.0 + inconsistencies * 0.5
             remaining_points = max(0, weights['crossRef'] - deduction)
             score += remaining_points
             
@@ -203,11 +204,16 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
                 ns_text = "nameserver" if broken_nameservers == 1 else "nameservers"
                 breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text + " found")
                 # Add specific broken nameserver details
-                for detail in inconsistency_details[:3]:  # Show first 3 issues
-                    if ": " in detail:
-                        breakdown.append("  • " + detail)
-                if len(inconsistency_details) > 3:
-                    breakdown.append("  • ... and " + str(len(inconsistency_details) - 3) + " more")
+                broken_details = [detail for detail in inconsistency_details if ": " in detail]
+                for detail in broken_details[:3]:  # Show first 3 broken nameserver issues
+                    breakdown.append("  • " + detail)
+                if len(broken_details) > 3:
+                    breakdown.append("  • ... and " + str(len(broken_details) - 3) + " more")
+                
+                # Also show inconsistencies if any
+                if inconsistencies > 0:
+                    ref_text = "reference" if inconsistencies == 1 else "references"
+                    breakdown.append("  • " + str(inconsistencies) + " additional inconsistent nameserver " + ref_text)
             elif inconsistencies > 0:
                 ref_text = "reference" if inconsistencies == 1 else "references"
                 breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
