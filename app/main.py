@@ -169,20 +169,48 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             issue_text = "issue" if glue_issues == 1 else "issues"
             breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(glue_issues) + " glue record " + issue_text + " found")
     
-    # Check cross-reference consistency
+    # Check cross-reference consistency and nameserver health
     if cross_ref_results:
-        inconsistencies = sum(1 for ns, info in cross_ref_results.items()
-                            if isinstance(info, dict) and info.get('references') and 
-                            ns not in info['references'])
-        if inconsistencies == 0:
+        inconsistencies = 0
+        broken_nameservers = 0
+        inconsistency_details = []
+        
+        for ns, info in cross_ref_results.items():
+            if isinstance(info, dict):
+                # Check for nameserver errors (broken/unreachable nameservers)
+                if info.get('error'):
+                    broken_nameservers += 1
+                    inconsistency_details.append(ns + ": " + info.get('error'))
+                
+                # Check for self-reference inconsistencies
+                refs = info.get('references', [])
+                if refs and ns.rstrip('.') not in [ref.rstrip('.') for ref in refs]:
+                    inconsistencies += 1
+                    inconsistency_details.append(ns + " does not reference itself")
+        
+        total_issues = inconsistencies + broken_nameservers
+        
+        if total_issues == 0:
             score += weights['crossRef']
             breakdown.append("+" + str(weights['crossRef']) + " points: All nameserver references are consistent")
         else:
-            deduction = min(inconsistencies * 0.5, weights['crossRef'])
-            remaining_points = weights['crossRef'] - deduction
+            # Heavy penalty for broken nameservers
+            deduction = min(broken_nameservers * 1.0 + inconsistencies * 0.5, weights['crossRef'])
+            remaining_points = max(0, weights['crossRef'] - deduction)
             score += remaining_points
-            ref_text = "reference" if inconsistencies == 1 else "references"
-            breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
+            
+            if broken_nameservers > 0:
+                ns_text = "nameserver" if broken_nameservers == 1 else "nameservers"
+                breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text + " found")
+                # Add specific broken nameserver details
+                for detail in inconsistency_details[:3]:  # Show first 3 issues
+                    if ": " in detail:
+                        breakdown.append("  • " + detail)
+                if len(inconsistency_details) > 3:
+                    breakdown.append("  • ... and " + str(len(inconsistency_details) - 3) + " more")
+            elif inconsistencies > 0:
+                ref_text = "reference" if inconsistencies == 1 else "references"
+                breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
     
     # Normalize score to be out of 10
     max_score = 10
@@ -393,7 +421,15 @@ def api_delegation():
                             dot.node(more_node, more_label, shape='ellipse', style='filled', fillcolor='lightgray')
                             dot.edge(domain, more_node)
                             break
-                        color = 'lightgreen' if info.get('self_reference') else 'lightyellow'
+                        
+                        # Color nameservers based on their status
+                        if info.get('error'):
+                            color = 'lightcoral'  # Red for broken nameservers
+                        elif info.get('self_reference'):
+                            color = 'lightgreen'  # Green for healthy nameservers with self-reference
+                        else:
+                            color = 'lightyellow'  # Yellow for nameservers without self-reference
+                        
                         dot.node(ns, ns, style='filled', fillcolor=color)
                         dot.edge(domain, ns)
                 
