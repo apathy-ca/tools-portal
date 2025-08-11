@@ -1,194 +1,207 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response, session
-import dns.resolver
-import dns.message
-import dns.query
-import dns.rdatatype
-import os
-from graphviz import Digraph
-import re
-import hashlib
-import time
-import csv
-import json
-import io
-from flask_caching import Cache
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from flask_compress import Compress
-from config import Config
-import logging
-from logging.handlers import RotatingFileHandler
+[Previous content up to the security headers]
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
-app.config.from_object(Config)
-
-# Initialize compression
-compress = Compress(app)
-
-# Configure cache
-cache = Cache(app)
-
-# Enhanced rate limiting
-limiter = Limiter(
-    app,
-    key_func=get_remote_address,
-    default_limits=[Config.RATELIMIT_DEFAULT],
-    storage_uri=Config.RATELIMIT_STORAGE_URL,
-    strategy=Config.RATELIMIT_STRATEGY
-)
-
-# Configure logging
-if not app.debug:
-    file_handler = RotatingFileHandler(Config.LOG_FILE, maxBytes=Config.LOG_MAX_BYTES, backupCount=Config.LOG_BACKUP_COUNT)
-    file_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('DNS By Eye startup')
-
-# Cache key generation function
-def make_cache_key(*args, **kwargs):
-    path = request.path
-    args = str(hash(frozenset(request.args.items())))
-    return (Config.CACHE_KEY_PREFIX + path + args).encode('utf-8')
-
-# Request validation middleware
-@app.before_request
-def validate_request():
-    if request.method == 'POST' and not request.is_json:
-        return jsonify({'error': 'Request must be JSON'}), 415
-    if request.content_length and request.content_length > Config.MAX_CONTENT_LENGTH:
-        return jsonify({'error': 'Request too large'}), 413
-
-# Error handling
-@app.errorhandler(Exception)
-def handle_exception(e):
-    app.logger.error(f"Unhandled exception: {str(e)}")
-    return jsonify({'error': 'An unexpected error occurred'}), 500
-
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return jsonify({'error': 'Rate limit exceeded', 'description': e.description}), 429
-
-@app.after_request
-def add_security_headers(response):
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com"
-    return response
-
-# Configure DNS resolver with timeouts
-resolver = dns.resolver.Resolver()
-resolver.timeout = Config.DNS_TIMEOUT
-resolver.lifetime = Config.DNS_LIFETIME
-
-# DNS timeout constant for direct queries
-DNS_TIMEOUT = Config.DNS_TIMEOUT
-
-# Input validation constants
-DOMAIN_REGEX = re.compile(r'^(?=.{4,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-_]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-IP_REGEX = re.compile(r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
-MAX_DOMAIN_LENGTH = 253
-MAX_DNS_SERVERS = ['system', '8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '9.9.9.9', '208.67.222.222', '208.67.220.220']
-
-def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
-    """Calculate DNS health score and provide detailed breakdown."""
-    score = 0
-    breakdown = []
+def check_glue_records(domain, custom_resolver=None):
+    """
+    Check glue records for all domains in the delegation chain.
+    This function performs comprehensive glue record validation by:
+    1. Getting NS records for each zone in the delegation chain
+    2. For each nameserver, checking if glue records (A/AAAA) are provided by the PARENT zone in the additional section
+    3. Verifying that the glue record IPs actually resolve to the nameserver names
+    4. Identifying missing, incorrect, or inconsistent glue records
     
-    # Weights for different layers
-    weights = {
-        'root': 1,    # Root servers
-        'tld': 1,     # TLD servers
-        'domain': 3,  # Domain nameservers
-        'glue': 3,    # Glue records
-        'crossRef': 2 # Cross-reference consistency
-    }
+    Glue records are provided by the parent zone, not the zone itself.
     
-    # Check each layer and add points
-    for i, node in enumerate(trace):
-        layer_weight = weights['root'] if i == 0 else (weights['tld'] if i == 1 else weights['domain'])
-        layer_score = 0
+    Returns a dict with detailed glue record analysis for each zone.
+    """
+    query_resolver = custom_resolver if custom_resolver else resolver
+    
+    # Build the delegation chain
+    labels = [label for label in domain.strip('.').split('.') if label]
+    reversed_labels = labels[::-1]
+    chain = ['.']
+    for i in range(len(reversed_labels)):
+        zone = '.'.join(reversed_labels[:i+1][::-1])
+        chain.append(zone)
+    
+    glue_results = {}
+    
+    for i, zone in enumerate(chain):
+        zone_result = {
+            'zone': zone,
+            'nameservers': [],
+            'glue_records': {},
+            'glue_issues': [],
+            'status': 'unknown'
+        }
         
-        # Check for DNS errors
-        if not any(ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')) 
-                  for ns in node['nameservers']):
-            layer_score += 0.7 * layer_weight
-            breakdown.append(f"+{(0.7 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) is healthy")
-        else:
-            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has errors")
+        # Skip glue record checking for root (.) zone only
+        if i == 0:  # 0 = root only
+            zone_result['status'] = 'skipped'
+            zone_result['glue_issues'].append(f"Glue record checking skipped for {zone} (root level)")
+            glue_results[zone] = zone_result
+            continue
         
-        # Check response time
-        if not node.get('is_slow', False):
-            layer_score += 0.3 * layer_weight
-            breakdown.append(f"+{(0.3 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) has good response time")
-        else:
-            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has slow response")
+        try:
+            # Get NS records for this zone
+            ns_response = query_resolver.resolve(zone, 'NS')
+            ns_list = [r.to_text().rstrip('.') for r in ns_response]
+            zone_result['nameservers'] = ns_list
+            zone_result['status'] = 'success'
+            
+            # Get the parent zone to query for glue records
+            parent_zone = chain[i-1] if i > 0 else '.'
+            
+            # For each nameserver, check glue records provided by the parent zone
+            for ns in ns_list:
+                ns_glue = {
+                    'nameserver': ns,
+                    'expected_glue': False,
+                    'has_glue_a': False,
+                    'has_glue_aaaa': False,
+                    'glue_a_records': [],
+                    'glue_aaaa_records': [],
+                    'resolved_a_records': [],
+                    'resolved_aaaa_records': [],
+                    'glue_matches_resolution': True,
+                    'issues': []
+                }
+                
+                # Determine if glue records are expected
+                # Glue records are needed when the nameserver is within the zone being delegated
+                if zone != '.' and (ns.endswith('.' + zone) or ns == zone):
+                    ns_glue['expected_glue'] = True
+                
+                # Query the parent zone for NS records of the current zone to get glue records
+                try:
+                    # Find a nameserver for the parent zone to query
+                    parent_ns_list = []
+                    if parent_zone == '.':
+                        # Use root servers
+                        parent_ns_list = ['a.root-servers.net', 'b.root-servers.net', 'c.root-servers.net']
+                    else:
+                        try:
+                            parent_ns_response = query_resolver.resolve(parent_zone, 'NS')
+                            parent_ns_list = [r.to_text().rstrip('.') for r in parent_ns_response]
+                        except:
+                            pass
+                    
+                    # Try to query one of the parent zone's nameservers
+                    for parent_ns in parent_ns_list:
+                        try:
+                            # Get IP of parent nameserver
+                            parent_ns_ips = query_resolver.resolve(parent_ns, 'A')
+                            if parent_ns_ips:
+                                query_target = parent_ns_ips[0].to_text()
+                                
+                                # Create DNS message for NS query of the child zone
+                                query_msg = dns.message.make_query(zone, 'NS')
+                                response = dns.query.udp(query_msg, query_target, timeout=DNS_TIMEOUT)
+                                
+                                # Check additional section for glue records
+                                for rr in response.additional:
+                                    if rr.name.to_text().rstrip('.') == ns:
+                                        if rr.rdtype == dns.rdatatype.A:
+                                            ns_glue['has_glue_a'] = True
+                                            for rd in rr:
+                                                ns_glue['glue_a_records'].append(rd.to_text())
+                                        elif rr.rdtype == dns.rdatatype.AAAA:
+                                            ns_glue['has_glue_aaaa'] = True
+                                            for rd in rr:
+                                                ns_glue['glue_aaaa_records'].append(rd.to_text())
+                                break  # Found glue records from this parent NS, no need to try others
+                        except Exception as e:
+                            continue  # Try next parent nameserver
+                
+                except Exception as e:
+                    ns_glue['issues'].append(f"Error checking glue records from parent zone: {e}")
+                
+                # Get resolved A and AAAA records for comparison
+                try:
+                    a_records = query_resolver.resolve(ns, 'A')
+                    ns_glue['resolved_a_records'] = [r.to_text() for r in a_records]
+                except:
+                    pass
+                
+                try:
+                    aaaa_records = query_resolver.resolve(ns, 'AAAA')
+                    ns_glue['resolved_aaaa_records'] = [r.to_text() for r in aaaa_records]
+                except:
+                    pass
+                
+                # Check if glue records match resolved records
+                if ns_glue['glue_a_records'] and ns_glue['resolved_a_records']:
+                    if set(ns_glue['glue_a_records']) != set(ns_glue['resolved_a_records']):
+                        ns_glue['glue_matches_resolution'] = False
+                        ns_glue['issues'].append("Glue A records don't match resolved A records")
+                
+                if ns_glue['glue_aaaa_records'] and ns_glue['resolved_aaaa_records']:
+                    if set(ns_glue['glue_aaaa_records']) != set(ns_glue['resolved_aaaa_records']):
+                        ns_glue['glue_matches_resolution'] = False
+                        ns_glue['issues'].append("Glue AAAA records don't match resolved AAAA records")
+                
+                # Check for missing glue records when expected
+                if ns_glue['expected_glue']:
+                    if not ns_glue['has_glue_a'] and ns_glue['resolved_a_records']:
+                        ns_glue['issues'].append("Missing glue A records (expected for in-zone nameserver)")
+                    if not ns_glue['has_glue_aaaa'] and ns_glue['resolved_aaaa_records']:
+                        ns_glue['issues'].append("Missing glue AAAA records (expected for in-zone nameserver)")
+                
+                # Check for unnecessary glue records
+                if not ns_glue['expected_glue']:
+                    if ns_glue['has_glue_a'] or ns_glue['has_glue_aaaa']:
+                        ns_glue['issues'].append("Unnecessary glue records (nameserver is out-of-zone)")
+                
+                zone_result['glue_records'][ns] = ns_glue
+                
+                # Add issues to zone-level issues
+                if ns_glue['issues']:
+                    zone_result['glue_issues'].extend([f"{ns}: {issue}" for issue in ns_glue['issues']])
+            
+        except dns.resolver.NXDOMAIN:
+            zone_result['status'] = 'nxdomain'
+            zone_result['glue_issues'].append(f"Zone {zone} does not exist")
+        except dns.resolver.NoAnswer:
+            zone_result['status'] = 'no_ns'
+            zone_result['glue_issues'].append(f"No NS records found for {zone}")
+        except Exception as e:
+            zone_result['status'] = 'error'
+            zone_result['glue_issues'].append(f"Error querying {zone}: {e}")
         
-        score += layer_score
+        glue_results[zone] = zone_result
     
-    # Check glue records
-    if glue_results:
-        # Only count actual glue record issues (ignore unnecessary glue warnings)
-        glue_issues = 0
-        for zone in glue_results.values():
-            for issue in zone.get('glue_issues', []):
-                # Skip unnecessary glue record warnings
-                if not "Unnecessary glue records" in issue:
-                    glue_issues += 1
-        
-        if glue_issues == 0:
-            score += weights['glue']
-            breakdown.append(f"+{weights['glue']} points: All glue records are correct")
-        else:
-            deduction = min(glue_issues * 0.5, weights['glue'])
-            remaining_points = weights['glue'] - deduction
-            score += remaining_points
-            breakdown.append(f"+{remaining_points:.1f} points: {glue_issues} glue record issue{'' if glue_issues == 1 else 's'} found")
-    
-    # Check cross-reference consistency
-    if cross_ref_results:
-        inconsistencies = sum(1 for ns, info in cross_ref_results.items()
-                            if isinstance(info, dict) and info.get('references') and 
-                            ns not in info['references'])
-        if inconsistencies == 0:
-            score += weights['crossRef']
-            breakdown.append(f"+{weights['crossRef']} points: All nameserver references are consistent")
-        else:
-            deduction = min(inconsistencies * 0.5, weights['crossRef'])
-            remaining_points = weights['crossRef'] - deduction
-            score += remaining_points
-            breakdown.append(f"+{remaining_points:.1f} points: {inconsistencies} inconsistent nameserver reference{'' if inconsistencies == 1 else 's'} found")
-    
-    # Normalize score to be out of 10
-    max_score = 10
-    score = min(10, round(score, 1))
-    
-    return {
-        'score': score,
-        'max_score': max_score,
-        'breakdown': breakdown,
-        'percentage': (score / max_score) * 100
-    }
+    return glue_results
 
-def is_valid_domain(domain):
-    """Validate domain name format and length."""
-    if not domain or len(domain) > MAX_DOMAIN_LENGTH:
-        return False
-    try:
-        return bool(DOMAIN_REGEX.match(domain.strip('.')))
-    except Exception:
-        return False
-
-def is_valid_dns_server(dns_server):
-    """Validate DNS server is either 'system' or a valid IP from our allowed list."""
-    if not dns_server:
-        return False
-    if dns_server == 'system':
-        return True
-    return dns_server in MAX_DNS_SERVERS and bool(IP_REGEX.match(dns_server))
+def test_last_level_ns_references(nameservers, domain):
+    """Test cross-references between nameservers at the last level."""
+    results = {}
+    for ns in nameservers:
+        results[ns] = {'references': set()}
+    
+    for ns in nameservers:
+        try:
+            # Query this nameserver for NS records of the domain
+            ns_ips = resolver.resolve(ns, 'A')
+            if ns_ips:
+                query_target = ns_ips[0].to_text()
+                query_msg = dns.message.make_query(domain, 'NS')
+                response = dns.query.udp(query_msg, query_target, timeout=DNS_TIMEOUT)
+                
+                # Extract nameservers from the response
+                for rr in response.answer:
+                    if rr.rdtype == dns.rdatatype.NS:
+                        for rd in rr:
+                            ref_ns = rd.to_text().rstrip('.')
+                            if ref_ns in nameservers:
+                                results[ns]['references'].add(ref_ns)
+        except Exception as e:
+            results[ns] = f"Error querying nameserver: {e}"
+    
+    # Convert sets to lists for JSON serialization
+    for ns in results:
+        if isinstance(results[ns], dict):
+            results[ns]['references'] = list(results[ns]['references'])
+    
+    return results
 
 def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
     """
@@ -302,33 +315,4 @@ def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
             if i > 1:  # 0=root, 1=TLD, 2+=domain levels
                 should_continue = False
         
-        # Flag slow responses (>2000ms is considered slow for DNS)
-        is_slow = response_time > 2000
-        timing_info[zone] = {
-            'response_time': response_time, 
-            'is_slow': is_slow,
-            'error_type': error_type
-        }
-        
-        result.append({
-            'zone': zone, 
-            'nameservers': ns_list, 
-            'verbose': verbose_info if verbose else None,
-            'response_time': response_time,
-            'is_slow': is_slow,
-            'error_type': error_type,
-            'trace_stopped': not should_continue and i < len(chain) - 1
-        })
-    
-    # If we stopped early, update the chain to reflect what was actually traced
-    if not should_continue and len(result) < len(chain):
-        chain = chain[:len(result)]
-    
-    return result, chain, timing_info if debug else {}
-
-def create_custom_resolver(dns_server):
-    """Create a custom DNS resolver with specified server."""
-    if not dns_server or dns_server == 'system':
-        return None  # Use system default
-    
-    custom_
+        # Flag slow

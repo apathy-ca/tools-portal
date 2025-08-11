@@ -277,27 +277,41 @@ if __name__ == "__main__":
         function calculateHealthScore(data) {
             let score = 0;
             let breakdown = [];
-            let maxScore = 10;
+            const maxScore = 10;
+            
+            // Weights for different layers
+            const weights = {
+                root: 1,
+                tld: 1,
+                domain: 3,
+                glue: 3,
+                crossRef: 2
+            };
             
             // Check each layer and add points
             data.trace.forEach((node, index) => {
+                let layerWeight = index === 0 ? weights.root : (index === 1 ? weights.tld : weights.domain);
+                let layerScore = 0;
+                
                 if (!node.nameservers.some(ns => ns.startsWith('Error:') || 
                     ns.startsWith('NXDOMAIN:') || 
                     ns.startsWith('No NS records:') || 
                     ns.startsWith('Timeout:') || 
                     ns.startsWith('No nameservers:'))) {
-                    score++;
-                    breakdown.push(`+1 point: Layer ${index + 1} (${node.zone}) is healthy`);
+                    layerScore += 0.7 * layerWeight;
+                    breakdown.push(`+${(0.7 * layerWeight).toFixed(1)} points: Layer ${index + 1} (${node.zone}) is healthy`);
                 } else {
                     breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has errors`);
                 }
                 
                 if (!node.is_slow) {
-                    score += 0.5;
-                    breakdown.push(`+0.5 points: Layer ${index + 1} (${node.zone}) has good response time`);
+                    layerScore += 0.3 * layerWeight;
+                    breakdown.push(`+${(0.3 * layerWeight).toFixed(1)} points: Layer ${index + 1} (${node.zone}) has good response time`);
                 } else {
                     breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has slow response`);
                 }
+                
+                score += layerScore;
             });
             
             // Check glue records if available
@@ -310,12 +324,12 @@ if __name__ == "__main__":
                 });
                 
                 if (glueIssues === 0) {
-                    score++;
-                    breakdown.push('+1 point: All glue records are correct');
+                    score += weights.glue;
+                    breakdown.push(`+${weights.glue} points: All glue records are correct`);
                 } else {
-                    let deduction = Math.min(glueIssues * 0.5, 1);
-                    score -= deduction;
-                    breakdown.push(`-${deduction.toFixed(1)} points: ${glueIssues} glue record issue${glueIssues > 1 ? 's' : ''} found`);
+                    let deduction = Math.min(glueIssues * 0.5, weights.glue);
+                    score += (weights.glue - deduction);
+                    breakdown.push(`+${(weights.glue - deduction).toFixed(1)} points: ${glueIssues} glue record issue${glueIssues > 1 ? 's' : ''} found`);
                 }
             }
             
@@ -329,21 +343,17 @@ if __name__ == "__main__":
                 });
                 
                 if (inconsistencies === 0) {
-                    score++;
-                    breakdown.push('+1 point: All nameserver references are consistent');
+                    score += weights.crossRef;
+                    breakdown.push(`+${weights.crossRef} points: All nameserver references are consistent`);
                 } else {
-                    let deduction = Math.min(inconsistencies * 0.5, 1);
-                    score -= deduction;
-                    breakdown.push(`-${deduction.toFixed(1)} points: ${inconsistencies} inconsistent nameserver reference${inconsistencies > 1 ? 's' : ''} found`);
+                    let deduction = Math.min(inconsistencies * 0.5, weights.crossRef);
+                    score += (weights.crossRef - deduction);
+                    breakdown.push(`+${(weights.crossRef - deduction).toFixed(1)} points: ${inconsistencies} inconsistent nameserver reference${inconsistencies > 1 ? 's' : ''} found`);
                 }
             }
             
-            // Round score to one decimal place
-            score = Math.round(score * 10) / 10;
-            
-            // Adjust maxScore based on available checks
-            maxScore = data.trace.length * 1.5 + (data.glue_results ? 1 : 0) + (data.cross_ref_results ? 1 : 0);
-            maxScore = Math.round(maxScore * 10) / 10;
+            // Normalize score to be out of 10
+            score = Math.min(10, Math.round(score * 10) / 10);
             
             return { score, maxScore, breakdown };
         }
