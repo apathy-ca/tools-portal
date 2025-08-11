@@ -19,15 +19,23 @@ $ORIGIN test.apathy.ca.
 @       IN      NS      ns3.broken.example.    ; Intentionally broken - non-existent domain
 @       IN      NS      ns4.test.apathy.ca.
 
-; A records for some nameservers (missing glue for others)
+; A records for some nameservers (intentional glue record issues)
 ns1     IN      A       97.107.131.151          ; Working nameserver
-ns2     IN      A       192.0.2.2               ; RFC 5737 test address (may not respond)
-; ns3 has no A record (broken glue)
-ns4     IN      A       203.0.113.4             ; Another RFC 5737 test address
+ns2     IN      A       192.0.2.2               ; Correct glue record
+ns2     IN      A       192.0.2.3               ; Incorrect additional glue record (mismatch)
+; ns3 has no A record (missing glue)
+; ns4 has no A record (another missing glue)
 
 ; AAAA records for IPv6 (partial coverage)
 ns1     IN      AAAA    2600:3c03::f03c:95ff:feeb:b42d  ; Working IPv6
 ; Missing AAAA for other nameservers
+
+; Glue record issues:
+; - ns1: Correct A and AAAA records
+; - ns2: Correct A record, but with an additional incorrect A record
+; - ns3: Missing A record (broken glue)
+; - ns4: Missing A record (another broken glue)
+; - All nameservers except ns1 are missing AAAA records
 
 ; Some test records
 @       IN      A       97.107.131.151
