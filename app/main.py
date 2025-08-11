@@ -345,23 +345,31 @@ def api_delegation():
         # Generate graphs for each level
         graph_urls = []
         try:
-            for i, node in enumerate(trace):
-                dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
-                dot.attr(rankdir='TB')  # Changed from 'LR' to 'TB' for top->down layout
-                
-                # Add zone node
-                dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
-                
-                # Add nameserver nodes and edges
-                for ns in node['nameservers']:
-                    if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
-                        dot.node(ns, ns)
-                        dot.edge(node['zone'], ns)
-                
-                # Save graph
-                filename = f"{domain.replace('.', '_')}_{i}"
-                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
+                    # Track which graphs we've already generated
+                    generated_graphs = set()
+                    for i, node in enumerate(trace):
+                        # Create a unique identifier for this graph
+                        graph_id = f"{node['zone']}"
+                        if graph_id in generated_graphs:
+                            continue
+                        generated_graphs.add(graph_id)
+                        
+                        dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
+                        dot.attr(rankdir='TB')  # Top->down layout
+                        
+                        # Add zone node
+                        dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
+                        
+                        # Add nameserver nodes and edges
+                        for ns in node['nameservers']:
+                            if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+                                dot.node(ns, ns)
+                                dot.edge(node['zone'], ns)
+                        
+                        # Save graph
+                        filename = f"{domain.replace('.', '_')}_{i}"
+                        dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
+                        graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
         except Exception as e:
             app.logger.error(f"Error generating graphs: {e}")
         
@@ -393,13 +401,18 @@ def api_delegation():
                     if isinstance(info, dict):
                         refs = info.get('references', [])
                         for ref in refs:
-                            if ref == ns:  # Self-reference
+                            ref = ref.rstrip('.')  # Normalize reference name
+                            ns_normalized = ns.rstrip('.')  # Normalize nameserver name
+                            if ref == ns_normalized:  # Self-reference
                                 dot.edge(ns, ns, dir='both', color='green', label='self-ref')
                             elif ref in cross_ref_results:
-                                if ns in cross_ref_results[ref].get('references', []):
-                                    dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
-                                else:
-                                    dot.edge(ns, ref, color='blue')
+                                ref_info = cross_ref_results[ref]
+                                if isinstance(ref_info, dict):
+                                    ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
+                                    if ns_normalized in ref_refs:
+                                        dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
+                                    else:
+                                        dot.edge(ns, ref, color='blue')
                 
                 # Save graph
                 filename = f"{domain.replace('.', '_')}_domain_report"
