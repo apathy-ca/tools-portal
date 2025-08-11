@@ -108,134 +108,116 @@ def create_custom_resolver(dns_server):
     return custom_resolver
 
 def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
-    """Calculate DNS health score and provide detailed breakdown."""
-    score = 0
+    """
+    Calculate DNS health score focused ONLY on the target domain.
+    Ignores root and TLD server health - only cares about the domain entered.
+    """
+    score = 10.0  # Start with perfect score
     breakdown = []
     
-    # Weights for different aspects
-    weights = {
-        'root': 1,    # Root servers
-        'tld': 1,     # TLD servers
-        'domain': 3,  # Domain nameservers
-        'glue': 3,    # Glue records
-        'crossRef': 2 # Cross-reference consistency
-    }
+    if not trace:
+        return {
+            'score': 0,
+            'max_score': 10,
+            'breakdown': ['No DNS trace data available'],
+            'percentage': 0
+        }
     
-    # Check each layer and add points
-    for i, node in enumerate(trace):
-        layer_weight = weights['root'] if i == 0 else (weights['tld'] if i == 1 else weights['domain'])
-        layer_score = 0
-        
-        # Check for DNS errors
-        if not any(ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')) 
-                  for ns in node['nameservers']):
-            layer_score += 0.7 * layer_weight
-            points = round(0.7 * layer_weight, 1)
-            zone_name = node['zone']
-            breakdown.append("+" + str(points) + " points: Layer " + str(i + 1) + " (" + zone_name + ") is healthy")
-        else:
-            zone_name = node['zone']
-            breakdown.append("+0 points: Layer " + str(i + 1) + " (" + zone_name + ") has errors")
-        
-        # Check response time
-        if not node.get('is_slow', False):
-            layer_score += 0.3 * layer_weight
-            points = round(0.3 * layer_weight, 1)
-            zone_name = node['zone']
-            breakdown.append("+" + str(points) + " points: Layer " + str(i + 1) + " (" + zone_name + ") has good response time")
-        else:
-            zone_name = node['zone']
-            breakdown.append("+0 points: Layer " + str(i + 1) + " (" + zone_name + ") has slow response")
-        
-        score += layer_score
+    # Get the target domain (last zone in the trace)
+    target_domain = trace[-1]['zone']
     
-    # Check glue records
-    if glue_results:
-        # Count major and minor glue record issues
-        major_glue_issues = 0
-        minor_glue_issues = 0
-        
-        for zone in glue_results.values():
-            for issue in zone.get('glue_issues', []):
-                # Skip informational messages that aren't actual issues
-                if "skipped" in issue.lower():
-                    continue
-                elif "Missing glue" in issue or "don't match" in issue:
-                    major_glue_issues += 1
-                else:
-                    minor_glue_issues += 1
-        
-        total_glue_issues = major_glue_issues + minor_glue_issues
-        
-        if total_glue_issues == 0:
-            score += weights['glue']
-            breakdown.append("+" + str(weights['glue']) + " points: All glue records are correct")
-        else:
-            # Major issues: -1 point each, Minor issues: -0.25 points each
-            deduction = major_glue_issues * 1.0 + minor_glue_issues * 0.25
-            remaining_points = max(0, weights['glue'] - deduction)
-            score += remaining_points
-            
-            if major_glue_issues > 0:
-                issue_text = "issue" if major_glue_issues == 1 else "issues"
-                breakdown.append("-" + str(round(major_glue_issues * 1.0, 1)) + " points: " + str(major_glue_issues) + " major glue " + issue_text + " found")
-            if minor_glue_issues > 0:
-                issue_text = "issue" if minor_glue_issues == 1 else "issues"
-                breakdown.append("-" + str(round(minor_glue_issues * 0.25, 1)) + " points: " + str(minor_glue_issues) + " minor glue " + issue_text + " found")
+    # 1. Check if the target domain's nameservers are reachable
+    target_nameservers = trace[-1]['nameservers']
+    broken_nameservers = []
     
-    # Check cross-reference consistency and nameserver health
+    for ns in target_nameservers:
+        if ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+            broken_nameservers.append(ns)
+    
+    if broken_nameservers:
+        penalty = len(broken_nameservers) * 2.0  # 2 points per broken nameserver
+        score -= penalty
+        breakdown.append("-" + str(penalty) + " points: " + str(len(broken_nameservers)) + " nameserver(s) unreachable")
+        for ns in broken_nameservers:
+            breakdown.append("  • " + ns)
+    else:
+        breakdown.append("+0 points: All nameservers are reachable")
+    
+    # 2. Check cross-reference consistency (nameservers must reference each other)
     if cross_ref_results:
-        inconsistencies = 0
-        broken_nameservers = 0
-        inconsistency_details = []
+        broken_ns_count = 0
+        missing_self_ref_count = 0
+        missing_cross_ref_count = 0
+        
+        working_nameservers = [ns for ns in cross_ref_results.keys() 
+                             if not cross_ref_results[ns].get('error')]
         
         for ns, info in cross_ref_results.items():
             if isinstance(info, dict):
-                # Check for nameserver errors (broken/unreachable nameservers)
+                # Count broken nameservers
                 if info.get('error'):
-                    broken_nameservers += 1
-                    inconsistency_details.append(ns + ": " + info.get('error'))
+                    broken_ns_count += 1
+                    continue
                 
-                # Check for self-reference inconsistencies
-                refs = info.get('references', [])
-                if refs and ns.rstrip('.') not in [ref.rstrip('.') for ref in refs]:
-                    inconsistencies += 1
-                    inconsistency_details.append(ns + " does not reference itself")
+                # Check self-reference
+                if not info.get('self_reference', False):
+                    missing_self_ref_count += 1
+                
+                # Check if this nameserver references all other working nameservers
+                refs = [ref.rstrip('.') for ref in info.get('references', [])]
+                for other_ns in working_nameservers:
+                    other_ns_clean = other_ns.rstrip('.')
+                    if other_ns_clean != ns.rstrip('.') and other_ns_clean not in refs:
+                        missing_cross_ref_count += 1
+                        break  # Only count once per nameserver
         
-        total_issues = inconsistencies + broken_nameservers
+        # Apply penalties
+        if broken_ns_count > 0:
+            penalty = broken_ns_count * 3.0  # 3 points per broken nameserver
+            score -= penalty
+            breakdown.append("-" + str(penalty) + " points: " + str(broken_ns_count) + " nameserver(s) have DNS errors")
         
-        if total_issues == 0:
-            score += weights['crossRef']
-            breakdown.append("+" + str(weights['crossRef']) + " points: All nameserver references are consistent")
-        else:
-            # Major issues: -1 point each (broken nameservers), Minor issues: -0.25 points each (inconsistencies)
-            deduction = broken_nameservers * 1.0 + inconsistencies * 0.25
-            remaining_points = max(0, weights['crossRef'] - deduction)
-            score += remaining_points
-            
-            if broken_nameservers > 0:
-                ns_text = "nameserver" if broken_nameservers == 1 else "nameservers"
-                breakdown.append("-" + str(round(broken_nameservers * 1.0, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text + " found")
-                # Add specific broken nameserver details
-                broken_details = [detail for detail in inconsistency_details if ": " in detail]
-                for detail in broken_details[:3]:  # Show first 3 broken nameserver issues
-                    breakdown.append("  • " + detail)
-                if len(broken_details) > 3:
-                    breakdown.append("  • ... and " + str(len(broken_details) - 3) + " more")
-            
-            if inconsistencies > 0:
-                ref_text = "reference" if inconsistencies == 1 else "references"
-                breakdown.append("-" + str(round(inconsistencies * 0.25, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
+        if missing_self_ref_count > 0:
+            penalty = missing_self_ref_count * 1.0  # 1 point per missing self-reference
+            score -= penalty
+            breakdown.append("-" + str(penalty) + " points: " + str(missing_self_ref_count) + " nameserver(s) don't reference themselves")
+        
+        if missing_cross_ref_count > 0:
+            penalty = missing_cross_ref_count * 0.5  # 0.5 points per missing cross-reference
+            score -= penalty
+            breakdown.append("-" + str(penalty) + " points: " + str(missing_cross_ref_count) + " nameserver(s) missing cross-references")
+        
+        if broken_ns_count == 0 and missing_self_ref_count == 0 and missing_cross_ref_count == 0:
+            breakdown.append("+0 points: All nameserver references are correct")
     
-    # Normalize score to be out of 10
-    max_score = 10
-    score = min(10, round(score, 1))
+    # 3. Check glue records ONLY for the target domain
+    if glue_results and target_domain in glue_results:
+        domain_glue = glue_results[target_domain]
+        glue_issues = 0
+        
+        for ns, ns_data in domain_glue.get('glue_records', {}).items():
+            issues = ns_data.get('issues', [])
+            for issue in issues:
+                if "Missing glue" in issue:
+                    glue_issues += 1
+                elif "don't match" in issue:
+                    glue_issues += 1
+        
+        if glue_issues > 0:
+            penalty = glue_issues * 1.0  # 1 point per glue issue
+            score -= penalty
+            breakdown.append("-" + str(penalty) + " points: " + str(glue_issues) + " glue record issue(s)")
+        else:
+            breakdown.append("+0 points: Glue records are correct")
+    
+    # Ensure score doesn't go below 0
+    score = max(0, round(score, 1))
     
     return {
         'score': score,
-        'max_score': max_score,
+        'max_score': 10,
         'breakdown': breakdown,
-        'percentage': (score / max_score) * 100
+        'percentage': (score / 10) * 100
     }
 
 # Request validation middleware
