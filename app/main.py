@@ -297,10 +297,7 @@ def get_dns_servers():
 
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_API_DEFAULT)
-@cache.memoize(timeout=300, unless=lambda: not Config.ENABLE_CACHING)
 def api_delegation():
-    # Create a cache key based on all relevant parameters
-    cache_key = f"{request.json.get('domain')}:{request.json.get('dns_server')}:{request.json.get('verbose')}:{request.json.get('check_glue')}"
     """API endpoint for DNS delegation analysis with visualizations."""
     try:
         # Validate request body
@@ -345,14 +342,7 @@ def api_delegation():
         # Generate graphs for each level
         graph_urls = []
         try:
-            # Generate one graph per unique zone
-            seen_zones = set()
             for i, node in enumerate(trace):
-                zone = node['zone']
-                if zone in seen_zones:
-                    continue
-                seen_zones.add(zone)
-                
                 dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
                 dot.attr(rankdir='TB')  # Top->down layout
                 
