@@ -404,23 +404,31 @@ def api_delegation():
                         ns_normalized = ns.rstrip('.')
                         refs = info.get('references', [])
                         for ref in refs:
-                            ref = ref.rstrip('.')
-                            if ref == ns_normalized:  # Self-reference
+                            ref_normalized = ref.rstrip('.')
+                            if ref_normalized == ns_normalized:  # Self-reference
                                 dot.edge(ns, ns, dir='both', color='green', label='self-ref')
-                            elif ref in cross_ref_results:
-                                # Create a unique identifier for this nameserver pair
-                                pair_id = tuple(sorted([ns_normalized, ref]))
-                                if pair_id not in processed_pairs:
-                                    processed_pairs.add(pair_id)
-                                    ref_info = cross_ref_results[ref]
-                                    if isinstance(ref_info, dict):
-                                        ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
-                                        if ns_normalized in ref_refs:
-                                            # Mutual reference - both servers reference each other
-                                            dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
-                                        else:
-                                            # One-way reference
-                                            dot.edge(ns, ref, color='blue')
+                            else:
+                                # Check if this nameserver exists in our results
+                                ref_key = None
+                                for key in cross_ref_results.keys():
+                                    if key.rstrip('.') == ref_normalized:
+                                        ref_key = key
+                                        break
+                                
+                                if ref_key:
+                                    # Create a unique identifier for this nameserver pair
+                                    pair_id = tuple(sorted([ns_normalized, ref_normalized]))
+                                    if pair_id not in processed_pairs:
+                                        processed_pairs.add(pair_id)
+                                        ref_info = cross_ref_results[ref_key]
+                                        if isinstance(ref_info, dict):
+                                            ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
+                                            if ns_normalized in ref_refs:
+                                                # Mutual reference - both servers reference each other
+                                                dot.edge(ns, ref_key, dir='both', color='blue', penwidth='2')
+                                            else:
+                                                # One-way reference
+                                                dot.edge(ns, ref_key, color='blue')
                 
                 # Save graph
                 filename = domain.replace('.', '_') + "_domain_report"
