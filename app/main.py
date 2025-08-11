@@ -151,20 +151,17 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
     
     # Check glue records
     if glue_results:
-        # Only count actual glue record issues (ignore unnecessary glue warnings)
+        # Count all glue record issues including unnecessary glue records
         glue_issues = 0
         for zone in glue_results.values():
-            for issue in zone.get('glue_issues', []):
-                # Skip unnecessary glue record warnings
-                if not "Unnecessary glue records" in issue:
-                    glue_issues += 1
+            glue_issues += len(zone.get('glue_issues', []))
         
         if glue_issues == 0:
             score += weights['glue']
             breakdown.append("+" + str(weights['glue']) + " points: All glue records are correct")
         else:
             deduction = min(glue_issues * 0.5, weights['glue'])
-            remaining_points = weights['glue'] - deduction
+            remaining_points = max(0, weights['glue'] - deduction)
             score += remaining_points
             issue_text = "issue" if glue_issues == 1 else "issues"
             breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(glue_issues) + " glue record " + issue_text + " found")
