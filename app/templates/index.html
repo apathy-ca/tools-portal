@@ -275,105 +275,73 @@ if __name__ == "__main__":
 
         // Health score calculation function
         function calculateHealthScore(data) {
-            let score = 10;
+            let score = 0;
             let breakdown = [];
+            let maxScore = 10;
             
-            // Check for errors in trace
-            let hasErrors = false;
-            let hasSlowResponses = false;
-            let errorCount = 0;
-            let slowCount = 0;
-            
-            data.trace.forEach(node => {
-                // Check for errors in nameservers
-                if (node.nameservers.some(ns => ns.startsWith('Error:') || 
+            // Check each layer and add points
+            data.trace.forEach((node, index) => {
+                if (!node.nameservers.some(ns => ns.startsWith('Error:') || 
                     ns.startsWith('NXDOMAIN:') || 
                     ns.startsWith('No NS records:') || 
                     ns.startsWith('Timeout:') || 
                     ns.startsWith('No nameservers:'))) {
-                    hasErrors = true;
-                    errorCount++;
+                    score++;
+                    breakdown.push(`+1 point: Layer ${index + 1} (${node.zone}) is healthy`);
+                } else {
+                    breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has errors`);
                 }
                 
-                // Check for slow responses
-                if (node.is_slow) {
-                    hasSlowResponses = true;
-                    slowCount++;
+                if (!node.is_slow) {
+                    score += 0.5;
+                    breakdown.push(`+0.5 points: Layer ${index + 1} (${node.zone}) has good response time`);
+                } else {
+                    breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has slow response`);
                 }
             });
             
-            // Deduct points for errors (-2 per error, max -4)
-            if (errorCount > 0) {
-                const deduction = Math.min(errorCount * 2, 4);
-                score -= deduction;
-                breakdown.push(`-${deduction} points: ${errorCount} DNS error${errorCount > 1 ? 's' : ''} detected`);
-            }
-            
-            // Deduct points for slow responses (-1 per slow response, max -2)
-            if (slowCount > 0) {
-                const deduction = Math.min(slowCount, 2);
-                score -= deduction;
-                breakdown.push(`-${deduction} points: ${slowCount} slow response${slowCount > 1 ? 's' : ''}`);
-            }
-            
             // Check glue records if available
             if (data.glue_results) {
-                let glueIssueCount = 0;
-                let glueErrorCount = 0;
-                
+                let glueCorrect = true;
                 Object.values(data.glue_results).forEach(zone => {
-                    if (zone.glue_issues) {
-                        zone.glue_issues.forEach(issue => {
-                            if (issue.includes('Missing glue') || issue.includes("don't match")) {
-                                glueErrorCount++;
-                            } else {
-                                glueIssueCount++;
-                            }
-                        });
+                    if (zone.glue_issues && zone.glue_issues.length > 0) {
+                        glueCorrect = false;
                     }
                 });
                 
-                // Deduct for glue record errors (-1 per error, max -2)
-                if (glueErrorCount > 0) {
-                    const deduction = Math.min(glueErrorCount, 2);
-                    score -= deduction;
-                    breakdown.push(`-${deduction} points: ${glueErrorCount} glue record error${glueErrorCount > 1 ? 's' : ''}`);
-                }
-                
-                // Deduct for glue record warnings (-0.5 per warning, max -1)
-                if (glueIssueCount > 0) {
-                    const deduction = Math.min(glueIssueCount * 0.5, 1);
-                    score -= deduction;
-                    breakdown.push(`-${deduction} points: ${glueIssueCount} glue record warning${glueIssueCount > 1 ? 's' : ''}`);
+                if (glueCorrect) {
+                    score++;
+                    breakdown.push('+1 point: All glue records are correct');
+                } else {
+                    breakdown.push('+0 points: Issues found with glue records');
                 }
             }
             
             // Check cross-reference consistency
             if (data.cross_ref_results) {
-                let inconsistentRefs = 0;
+                let allConsistent = true;
                 Object.entries(data.cross_ref_results).forEach(([ns, info]) => {
                     if (info.references && !info.references.includes(ns)) {
-                        inconsistentRefs++;
+                        allConsistent = false;
                     }
                 });
                 
-                // Deduct for inconsistent references (-1 per inconsistency, max -2)
-                if (inconsistentRefs > 0) {
-                    const deduction = Math.min(inconsistentRefs, 2);
-                    score -= deduction;
-                    breakdown.push(`-${deduction} points: ${inconsistentRefs} inconsistent nameserver reference${inconsistentRefs > 1 ? 's' : ''}`);
+                if (allConsistent) {
+                    score++;
+                    breakdown.push('+1 point: All nameserver references are consistent');
+                } else {
+                    breakdown.push('+0 points: Inconsistent nameserver references found');
                 }
             }
             
-            // Ensure score doesn't go below 0
-            score = Math.max(0, Math.round(score * 10) / 10);
+            // Round score to one decimal place
+            score = Math.round(score * 10) / 10;
             
-            // Add perfect score message if no deductions
-            if (breakdown.length === 0) {
-                breakdown.push('Perfect score! No issues detected');
-            }
+            // Adjust maxScore based on available checks
+            maxScore = data.trace.length * 1.5 + (data.glue_results ? 1 : 0) + (data.cross_ref_results ? 1 : 0);
+            maxScore = Math.round(maxScore * 10) / 10;
             
-            return { score, breakdown };
+            return { score, maxScore, breakdown };
         }
 
         // Update health score display
@@ -385,15 +353,16 @@ if __name__ == "__main__":
             const scoreDetails = document.getElementById('scoreDetails');
             const scoreBreakdown = document.getElementById('scoreBreakdown');
             
-            const { score, breakdown } = calculateHealthScore(data);
+            const { score, maxScore, breakdown } = calculateHealthScore(data);
             
             // Update score and color
-            scoreSpan.textContent = `${score}/10`;
+            scoreSpan.textContent = `${score}/${maxScore}`;
             
             let color;
-            if (score >= 10) {
+            const percentage = (score / maxScore) * 100;
+            if (percentage >= 90) {
                 color = '#28a745';  // Green
-            } else if (score >= 7) {
+            } else if (percentage >= 70) {
                 color = '#ffc107';  // Yellow
             } else {
                 color = '#dc3545';  // Red
@@ -404,17 +373,11 @@ if __name__ == "__main__":
             
             // Update breakdown with report card style
             const items = breakdown.map(item => {
-                let type, icon, color;
-                if (item.includes('Perfect score')) {
-                    type = 'success';
-                    icon = '🌟';
+                let icon, color;
+                if (item.startsWith('+1') || item.startsWith('+0.5')) {
+                    icon = '✅';
                     color = '#28a745';
-                } else if (item.includes('-0.5') || item.includes('-1')) {
-                    type = 'warning';
-                    icon = '⚠️';
-                    color = '#ffc107';
                 } else {
-                    type = 'error';
                     icon = '❌';
                     color = '#dc3545';
                 }
@@ -778,22 +741,41 @@ if __name__ == "__main__":
                         html += `</div>`;
                     });
                     
-                    // Show cross reference results if any (below the graph)
+                    // Show domain analysis results (formerly cross-reference results)
                     if (data.cross_ref_results && Object.keys(data.cross_ref_results).length > 0) {
-                        html += `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top:2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                    <details>
-                                        <summary style="cursor: pointer; font-weight: bold; color: #666;">Last Level Nameserver Cross-Reference Results</summary>
-                                        <ul style="text-align: left; margin-top: 10px;">`;
+                        html += `<div style="margin-top:2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                                    <h3 style="margin-top:0;">Domain Analysis</h3>
+                                    <ul style="text-align: left; margin-top: 10px; padding-left: 20px;">`;
                         for (const [ns, info] of Object.entries(data.cross_ref_results)) {
                             let refs = info.references || [];
                             let aRecords = info.A || [];
                             let aaaaRecords = info.AAAA || [];
-                            html += `<li style="margin: 10px 0;"><b>${ns}</b>:<br>
-                                     <span style="margin-left: 15px;">References: ${Array.isArray(refs) ? refs.join(', ') : refs}</span><br>
-                                     <span style="margin-left: 15px;">A: ${aRecords.join(', ')}</span><br>
-                                     <span style="margin-left: 15px;">AAAA: ${aaaaRecords.join(', ')}</span></li>`;
+                            let glueInfo = data.glue_results && data.glue_results[data.trace[data.trace.length - 1].zone]?.glue_records[ns];
+                            
+                            html += `<li style="margin: 10px 0;">
+                                     <h4 style="margin:5px 0;">${ns}</h4>
+                                     <div style="margin-left: 15px;">
+                                         <strong>References:</strong> ${Array.isArray(refs) ? refs.join(', ') : refs}<br>
+                                         <strong>A Records:</strong> ${aRecords.join(', ') || 'None'}<br>
+                                         <strong>AAAA Records:</strong> ${aaaaRecords.join(', ') || 'None'}<br>`;
+                            
+                            if (glueInfo) {
+                                html += `<strong>Glue Record Status:</strong> `;
+                                if (glueInfo.issues && glueInfo.issues.length > 0) {
+                                    html += `<span style="color: #dc3545;">❌ Issues Found</span><br>`;
+                                    html += `<ul style="margin-top: 5px;">`;
+                                    glueInfo.issues.forEach(issue => {
+                                        html += `<li style="color: #dc3545;">${issue}</li>`;
+                                    });
+                                    html += `</ul>`;
+                                } else {
+                                    html += `<span style="color: #28a745;">✅ No Issues</span>`;
+                                }
+                            }
+                            
+                            html += `</div></li>`;
                         }
-                        html += `</ul></details></div>`;
+                        html += `</ul></div>`;
                     }
                     
                     // Show glue record results if any
