@@ -397,8 +397,7 @@ def api_delegation():
                         dot.node(ns, ns, style='filled', fillcolor=color)
                         dot.edge(domain, ns)
                 
-                # Add edges for references
-                processed_pairs = set()  # Track which pairs of nameservers we've processed
+                # Add edges for references - use separate arrows for each direction
                 for ns, info in cross_ref_results.items():
                     if isinstance(info, dict):
                         ns_normalized = ns.rstrip('.')
@@ -416,19 +415,8 @@ def api_delegation():
                                         break
                                 
                                 if ref_key:
-                                    # Create a unique identifier for this nameserver pair
-                                    pair_id = tuple(sorted([ns_normalized, ref_normalized]))
-                                    if pair_id not in processed_pairs:
-                                        processed_pairs.add(pair_id)
-                                        ref_info = cross_ref_results[ref_key]
-                                        if isinstance(ref_info, dict):
-                                            ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
-                                            if ns_normalized in ref_refs:
-                                                # Mutual reference - both servers reference each other
-                                                dot.edge(ns, ref_key, dir='both', color='blue', penwidth='2')
-                                            else:
-                                                # One-way reference
-                                                dot.edge(ns, ref_key, color='blue')
+                                    # Always add a one-way arrow from this nameserver to the referenced one
+                                    dot.edge(ns, ref_key, color='blue', penwidth='2')
                 
                 # Save graph
                 filename = domain.replace('.', '_') + "_domain_report"
