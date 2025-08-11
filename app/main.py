@@ -331,6 +331,51 @@ def api_delegation():
         except Exception as e:
             app.logger.warning(f"Additional analysis failed for {domain}: {e}")
         
+        # Generate graphs for each level
+        graph_urls = []
+        try:
+            for i, node in enumerate(trace):
+                dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
+                dot.attr(rankdir='LR')
+                
+                # Add zone node
+                dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
+                
+                # Add nameserver nodes and edges
+                for ns in node['nameservers']:
+                    if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+                        dot.node(ns, ns)
+                        dot.edge(node['zone'], ns)
+                
+                # Save graph
+                filename = f"{domain.replace('.', '_')}_{i}"
+                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
+                graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
+        except Exception as e:
+            app.logger.error(f"Error generating graphs: {e}")
+        
+        # Generate cross-reference graph if available
+        cross_ref_graph_url = None
+        if cross_ref_results:
+            try:
+                dot = Digraph(comment=f'DNS Cross-Reference Graph for {domain}')
+                dot.attr(rankdir='LR')
+                
+                # Add nodes for each nameserver
+                for ns in cross_ref_results:
+                    if isinstance(cross_ref_results[ns], dict):
+                        dot.node(ns, ns)
+                        # Add edges for references
+                        for ref in cross_ref_results[ns].get('references', []):
+                            dot.edge(ns, ref)
+                
+                # Save graph
+                filename = f"{domain.replace('.', '_')}_cross_ref"
+                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
+                cross_ref_graph_url = url_for('static', filename=f'generated/{filename}.png')
+            except Exception as e:
+                app.logger.error(f"Error generating cross-reference graph: {e}")
+        
         return jsonify({
             'domain': domain,
             'chain': chain_str,
@@ -339,7 +384,9 @@ def api_delegation():
             'timing_info': timing,
             'glue_results': glue_results,
             'cross_ref_results': cross_ref_results,
-            'health_score': calculate_health_score(trace, glue_results, cross_ref_results)
+            'health_score': calculate_health_score(trace, glue_results, cross_ref_results),
+            'graph_urls': graph_urls,
+            'cross_ref_graph_url': cross_ref_graph_url
         })
     except Exception as e:
         app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")

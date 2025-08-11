@@ -388,12 +388,13 @@ if __name__ == "__main__":
             // Update breakdown with report card style
             const items = breakdown.map(item => {
                 let icon, color;
-                if (item.startsWith('+1') || item.startsWith('+0.5')) {
-                    icon = '✅';
-                    color = '#28a745';
-                } else {
+                if (item.includes('has errors') || item.includes('has slow response') || 
+                    item.includes('issue') || item.includes('inconsistent')) {
                     icon = '❌';
                     color = '#dc3545';
+                } else {
+                    icon = '✅';
+                    color = '#28a745';
                 }
                 
                 return `<div style="padding:10px; border-radius:4px; background:${color}15; border-left:4px solid ${color}; display:flex; align-items:center;">
