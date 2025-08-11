@@ -725,11 +725,11 @@ if __name__ == "__main__":
                         graphIndices.reverse();
                     }
                     
-                    // Always prepend cross-reference graph if available (at the top)
-                    if (data.cross_ref_graph_url) {
+                    // Always prepend Domain Report graph if available (at the top)
+                    if (data.domain_report_graph_url) {
                         html += `<div style="margin-bottom:2em; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                    <h3>Last Level Cross-Reference Graph</h3>
-                                    <img src="${data.cross_ref_graph_url}" alt="Cross-Reference Graph" style="max-width:100%; height: auto;"/>
+                                    <h3>Domain Report</h3>
+                                    <img src="${data.domain_report_graph_url}" alt="Domain Report Graph" style="max-width:100%; height: auto;"/>
                                  </div>`;
                     }
                     
@@ -890,11 +890,11 @@ if __name__ == "__main__":
                         html += `</div>`;
                     });
                     
-                    // Always append cross-reference graph if available
-                    if (window.lastGraphData.cross_ref_graph_url) {
+                    // Always append Domain Report graph if available
+                    if (window.lastGraphData.domain_report_graph_url) {
                         html += `<div style="margin-top:2em; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                    <h3>Last Level Cross-Reference Graph</h3>
-                                    <img src="${window.lastGraphData.cross_ref_graph_url}" alt="Cross-Reference Graph" style="max-width:100%; height: auto;"/>
+                                    <h3>Domain Report</h3>
+                                    <img src="${window.lastGraphData.domain_report_graph_url}" alt="Domain Report Graph" style="max-width:100%; height: auto;"/>
                                  </div>`;
                     }
                     

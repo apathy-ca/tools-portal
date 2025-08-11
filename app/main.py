@@ -336,7 +336,7 @@ def api_delegation():
         try:
             for i, node in enumerate(trace):
                 dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
-                dot.attr(rankdir='LR')
+                dot.attr(rankdir='TB')  # Changed from 'LR' to 'TB' for top->down layout
                 
                 # Add zone node
                 dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
@@ -354,27 +354,34 @@ def api_delegation():
         except Exception as e:
             app.logger.error(f"Error generating graphs: {e}")
         
-        # Generate cross-reference graph if available
-        cross_ref_graph_url = None
+        # Generate Domain Report graph
+        domain_report_graph_url = None
         if cross_ref_results:
             try:
-                dot = Digraph(comment=f'DNS Cross-Reference Graph for {domain}')
-                dot.attr(rankdir='LR')
+                dot = Digraph(comment=f'Domain Report for {domain}')
+                dot.attr(rankdir='TB')  # Top->down layout
+                
+                # Add domain node
+                dot.node(domain, domain, shape='box', style='filled', fillcolor='lightblue')
                 
                 # Add nodes for each nameserver
                 for ns in cross_ref_results:
                     if isinstance(cross_ref_results[ns], dict):
                         dot.node(ns, ns)
-                        # Add edges for references
+                        # Add edge from domain to nameserver
+                        dot.edge(domain, ns)
+                        # Add edges for references, including self-references
                         for ref in cross_ref_results[ns].get('references', []):
-                            dot.edge(ns, ref)
+                            dot.edge(ns, ref, color='blue')
+                        if ns in cross_ref_results[ns].get('references', []):
+                            dot.edge(ns, ns, color='green', label='self-ref')
                 
                 # Save graph
-                filename = f"{domain.replace('.', '_')}_cross_ref"
+                filename = f"{domain.replace('.', '_')}_domain_report"
                 dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                cross_ref_graph_url = url_for('static', filename=f'generated/{filename}.png')
+                domain_report_graph_url = url_for('static', filename=f'generated/{filename}.png')
             except Exception as e:
-                app.logger.error(f"Error generating cross-reference graph: {e}")
+                app.logger.error(f"Error generating Domain Report graph: {e}")
         
         return jsonify({
             'domain': domain,
