@@ -524,6 +524,11 @@ def export_data(domain):
                 if isinstance(info, dict):
                     writer.writerow(['Nameserver:', ns])
                     writer.writerow(['References:', '; '.join(info.get('references', []))])
+                    writer.writerow(['Self Reference:', 'Yes' if info.get('self_reference') else 'No'])
+                    if info.get('mutual_references'):
+                        writer.writerow(['Mutual References:', '; '.join(info.get('mutual_references', []))])
+                    if info.get('error'):
+                        writer.writerow(['Error:', info.get('error')])
                     writer.writerow([])
             
             # Write health score
@@ -781,19 +786,33 @@ def test_last_level_ns_references(nameservers, domain):
                 response = dns.query.udp(query_msg, query_target, timeout=DNS_TIMEOUT)
                 
                 # Extract nameservers from the response
-                for rr in response.answer:
-                    if rr.rdtype == dns.rdatatype.NS:
-                        for rd in rr:
-                            ref_ns = rd.to_text().rstrip('.')
-                            if ref_ns in nameservers:
+                for section in [response.answer, response.authority]:
+                    for rr in section:
+                        if rr.rdtype == dns.rdatatype.NS:
+                            for rd in rr:
+                                ref_ns = rd.to_text().rstrip('.')
+                                # Always add the reference, even if it's not in our nameserver list
+                                # This helps catch cases where a nameserver references itself or others
                                 results[ns]['references'].add(ref_ns)
         except Exception as e:
-            results[ns] = f"Error querying nameserver: {e}"
+            app.logger.warning(f"Error querying nameserver {ns} for {domain}: {e}")
+            results[ns] = {'references': set(), 'error': str(e)}
     
-    # Convert sets to lists for JSON serialization
-    for ns in results:
-        if isinstance(results[ns], dict):
-            results[ns]['references'] = list(results[ns]['references'])
+    # Convert sets to lists for JSON serialization and ensure all nameservers are included
+    for ns in nameservers:
+        if isinstance(results.get(ns), dict):
+            results[ns]['references'] = sorted(list(results[ns]['references']))
+            # Add self-reference indicator
+            results[ns]['self_reference'] = ns in results[ns]['references']
+            # Add mutual reference indicators
+            results[ns]['mutual_references'] = [
+                ref for ref in results[ns]['references']
+                if ref in nameservers and 
+                   isinstance(results.get(ref), dict) and
+                   ns in results[ref]['references']
+            ]
+        else:
+            results[ns] = {'references': [], 'error': str(results.get(ns, 'Unknown error'))}
     
     return results
 
