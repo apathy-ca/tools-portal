@@ -728,7 +728,20 @@ if __name__ == "__main__":
                     // Show domain report and glue records after the domain level but before other levels
                     let domainLevelIndex = data.trace.length - 1;
                     
-                    // Show domain level first
+                    // Show Domain Report first
+                    if (data.domain_report_graph_url) {
+                        html += `<div style="margin-bottom:2em; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                                    <h3>Domain Report</h3>
+                                    <img src="${data.domain_report_graph_url}" alt="Domain Report Graph" style="max-width:100%; height: auto;"/>
+                                 </div>`;
+                    }
+                    
+                    // Show glue records analysis
+                    if (data.glue_results && Object.keys(data.glue_results).length > 0) {
+                        html += renderGlueRecords(data.glue_results, check_glue);
+                    }
+                    
+                    // Show domain level
                     const domainUrl = data.graph_urls[domainLevelIndex];
                     const domainLayerName = data.trace[domainLevelIndex].zone;
                     html += `<div style="margin-bottom: 2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
@@ -747,19 +760,6 @@ if __name__ == "__main__":
                                  </div>`;
                     }
                     html += `</div>`;
-                    
-                    // Show Domain Report
-                    if (data.domain_report_graph_url) {
-                        html += `<div style="margin-bottom:2em; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                    <h3>Domain Report</h3>
-                                    <img src="${data.domain_report_graph_url}" alt="Domain Report Graph" style="max-width:100%; height: auto;"/>
-                                 </div>`;
-                    }
-                    
-                    // Show glue records analysis
-                    if (data.glue_results && Object.keys(data.glue_results).length > 0) {
-                        html += renderGlueRecords(data.glue_results, check_glue);
-                    }
                     
                     // Show remaining levels (except domain level)
                     for (let i = domainLevelIndex - 1; i >= 0; i--) {
