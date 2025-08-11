@@ -50,9 +50,9 @@
             <button class="details" style="background:none; border:1px solid #ccc; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:0.8em;">Details</button>
         </div>
     </div>
-    <div id="scoreDetails" style="display:none; margin-bottom:1em; padding:10px; border:1px solid #ddd; border-radius:4px; background:#f8f9fa;">
-        <h4 style="margin:0 0 10px 0;">DNS Health Score Breakdown</h4>
-        <ul style="margin:0; padding-left:20px;" id="scoreBreakdown"></ul>
+    <div id="scoreDetails" style="display:none; margin-bottom:1em; padding:15px; border:1px solid #ddd; border-radius:4px; background:#f8f9fa;">
+        <h4 style="margin:0 0 15px 0; text-align:center; font-size:1.2em;">DNS Health Report Card</h4>
+        <div id="scoreBreakdown" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
     <div style="display:flex; align-items:center; gap:15px; margin-bottom:1em; flex-wrap: wrap;">
         <label>
@@ -402,8 +402,29 @@ if __name__ == "__main__":
             indicator.style.backgroundColor = color;
             healthScore.style.display = 'flex';
             
-            // Update breakdown
-            scoreBreakdown.innerHTML = breakdown.map(item => `<li>${item}</li>`).join('');
+            // Update breakdown with report card style
+            const items = breakdown.map(item => {
+                let type, icon, color;
+                if (item.includes('Perfect score')) {
+                    type = 'success';
+                    icon = '🌟';
+                    color = '#28a745';
+                } else if (item.includes('-0.5') || item.includes('-1')) {
+                    type = 'warning';
+                    icon = '⚠️';
+                    color = '#ffc107';
+                } else {
+                    type = 'error';
+                    icon = '❌';
+                    color = '#dc3545';
+                }
+                
+                return `<div style="padding:10px; border-radius:4px; background:${color}15; border-left:4px solid ${color}; display:flex; align-items:center;">
+                    <span style="margin-right:10px; font-size:1.2em;">${icon}</span>
+                    <span>${item}</span>
+                </div>`;
+            });
+            scoreBreakdown.innerHTML = items.join('');
             
             // Show/hide details
             details.onclick = () => {
@@ -596,25 +617,36 @@ if __name__ == "__main__":
                             // Expected glue status
                             html += `<div><strong>Expected Glue:</strong> ${nsData.expected_glue ? 'Yes (in-zone nameserver)' : 'No (out-of-zone nameserver)'}</div>`;
                             
-                            // Glue record status
-                            html += `<div><strong>Has Glue A:</strong> ${nsData.has_glue_a ? 'Yes' : 'No'}</div>`;
-                            html += `<div><strong>Has Glue AAAA:</strong> ${nsData.has_glue_aaaa ? 'Yes' : 'No'}</div>`;
+                            // Parent zone glue record status
+                            html += `<div style="margin-top:8px;"><strong>Glue Records from Parent Zone:</strong></div>`;
+                            html += `<div style="margin-left:15px;">
+                                <div><strong>Has A Record:</strong> ${nsData.has_glue_a ? 'Yes' : 'No'}</div>
+                                <div><strong>Has AAAA Record:</strong> ${nsData.has_glue_aaaa ? 'Yes' : 'No'}</div>
+                            </div>`;
                             
-                            // Show glue records if present
-                            if (nsData.glue_a_records && nsData.glue_a_records.length > 0) {
-                                html += `<div><strong>Glue A Records:</strong> ${nsData.glue_a_records.join(', ')}</div>`;
-                            }
-                            if (nsData.glue_aaaa_records && nsData.glue_aaaa_records.length > 0) {
-                                html += `<div><strong>Glue AAAA Records:</strong> ${nsData.glue_aaaa_records.join(', ')}</div>`;
-                            }
+                            // Show records comparison in a table
+                            html += `<div style="margin-top:8px;"><strong>Records Comparison:</strong></div>`;
+                            html += `<table style="margin-left:15px; border-collapse:collapse; width:calc(100% - 15px);">
+                                <tr style="background:#f8f9fa;">
+                                    <th style="text-align:left; padding:4px;">Record Type</th>
+                                    <th style="text-align:left; padding:4px;">Parent Zone Glue</th>
+                                    <th style="text-align:left; padding:4px;">Actual Resolution</th>
+                                </tr>`;
                             
-                            // Show resolved records for comparison
-                            if (nsData.resolved_a_records && nsData.resolved_a_records.length > 0) {
-                                html += `<div><strong>Resolved A Records:</strong> ${nsData.resolved_a_records.join(', ')}</div>`;
-                            }
-                            if (nsData.resolved_aaaa_records && nsData.resolved_aaaa_records.length > 0) {
-                                html += `<div><strong>Resolved AAAA Records:</strong> ${nsData.resolved_aaaa_records.join(', ')}</div>`;
-                            }
+                            // A Records
+                            html += `<tr>
+                                <td style="padding:4px;"><strong>A</strong></td>
+                                <td style="padding:4px;">${nsData.glue_a_records?.join(', ') || 'None'}</td>
+                                <td style="padding:4px;">${nsData.resolved_a_records?.join(', ') || 'None'}</td>
+                            </tr>`;
+                            
+                            // AAAA Records
+                            html += `<tr>
+                                <td style="padding:4px;"><strong>AAAA</strong></td>
+                                <td style="padding:4px;">${nsData.glue_aaaa_records?.join(', ') || 'None'}</td>
+                                <td style="padding:4px;">${nsData.resolved_aaaa_records?.join(', ') || 'None'}</td>
+                            </tr>
+                            </table>`;
                             
                             // Show match status
                             html += `<div><strong>Glue Matches Resolution:</strong> ${nsData.glue_matches_resolution ? 'Yes' : 'No'}</div>`;
