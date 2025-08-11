@@ -335,9 +335,11 @@ def check_glue_records(domain, custom_resolver=None):
     Check glue records for all domains in the delegation chain.
     This function performs comprehensive glue record validation by:
     1. Getting NS records for each zone in the delegation chain
-    2. For each nameserver, checking if glue records (A/AAAA) are provided in the additional section
+    2. For each nameserver, checking if glue records (A/AAAA) are provided by the PARENT zone in the additional section
     3. Verifying that the glue record IPs actually resolve to the nameserver names
     4. Identifying missing, incorrect, or inconsistent glue records
+    
+    Glue records are provided by the parent zone, not the zone itself.
     
     Returns a dict with detailed glue record analysis for each zone.
     """
@@ -376,7 +378,10 @@ def check_glue_records(domain, custom_resolver=None):
             zone_result['nameservers'] = ns_list
             zone_result['status'] = 'success'
             
-            # For each nameserver, check glue records
+            # Get the parent zone to query for glue records
+            parent_zone = chain[i-1] if i > 0 else '.'
+            
+            # For each nameserver, check glue records provided by the parent zone
             for ns in ns_list:
                 ns_glue = {
                     'nameserver': ns,
@@ -396,25 +401,30 @@ def check_glue_records(domain, custom_resolver=None):
                 if zone != '.' and (ns.endswith('.' + zone) or ns == zone):
                     ns_glue['expected_glue'] = True
                 
-                # Try to get the full DNS response with additional section
+                # Query the parent zone for NS records of the current zone to get glue records
                 try:
-                    # Query one of the nameservers for this zone to get glue records
-                    if zone_result['nameservers']:
-                        # Try to find an IP for one of the nameservers to query
-                        query_target = None
-                        for test_ns in zone_result['nameservers']:
-                            try:
-                                test_ns_ips = query_resolver.resolve(test_ns, 'A')
-                                if test_ns_ips:
-                                    query_target = test_ns_ips[0].to_text()
-                                    break
-                            except:
-                                continue
-                        
-                        if query_target:
-                            # Create DNS message for NS query
-                            query_msg = dns.message.make_query(zone, 'NS')
-                            try:
+                    # Find a nameserver for the parent zone to query
+                    parent_ns_list = []
+                    if parent_zone == '.':
+                        # Use root servers
+                        parent_ns_list = ['a.root-servers.net', 'b.root-servers.net', 'c.root-servers.net']
+                    else:
+                        try:
+                            parent_ns_response = query_resolver.resolve(parent_zone, 'NS')
+                            parent_ns_list = [r.to_text().rstrip('.') for r in parent_ns_response]
+                        except:
+                            pass
+                    
+                    # Try to query one of the parent zone's nameservers
+                    for parent_ns in parent_ns_list:
+                        try:
+                            # Get IP of parent nameserver
+                            parent_ns_ips = query_resolver.resolve(parent_ns, 'A')
+                            if parent_ns_ips:
+                                query_target = parent_ns_ips[0].to_text()
+                                
+                                # Create DNS message for NS query of the child zone
+                                query_msg = dns.message.make_query(zone, 'NS')
                                 response = dns.query.udp(query_msg, query_target, timeout=DNS_TIMEOUT)
                                 
                                 # Check additional section for glue records
@@ -428,11 +438,12 @@ def check_glue_records(domain, custom_resolver=None):
                                             ns_glue['has_glue_aaaa'] = True
                                             for rd in rr:
                                                 ns_glue['glue_aaaa_records'].append(rd.to_text())
-                            except:
-                                pass
+                                break  # Found glue records from this parent NS, no need to try others
+                        except Exception as e:
+                            continue  # Try next parent nameserver
                 
                 except Exception as e:
-                    ns_glue['issues'].append(f"Error checking glue records: {e}")
+                    ns_glue['issues'].append(f"Error checking glue records from parent zone: {e}")
                 
                 # Get resolved A and AAAA records for comparison
                 try:
