@@ -157,7 +157,10 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
         
         for zone in glue_results.values():
             for issue in zone.get('glue_issues', []):
-                if "Missing glue" in issue or "don't match" in issue:
+                # Skip informational messages that aren't actual issues
+                if "skipped" in issue.lower():
+                    continue
+                elif "Missing glue" in issue or "don't match" in issue:
                     major_glue_issues += 1
                 else:
                     minor_glue_issues += 1
