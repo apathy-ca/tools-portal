@@ -345,31 +345,30 @@ def api_delegation():
         # Generate graphs for each level
         graph_urls = []
         try:
-                    # Track which graphs we've already generated
-                    generated_graphs = set()
-                    for i, node in enumerate(trace):
-                        # Create a unique identifier for this graph
-                        graph_id = f"{node['zone']}"
-                        if graph_id in generated_graphs:
-                            continue
-                        generated_graphs.add(graph_id)
-                        
-                        dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
-                        dot.attr(rankdir='TB')  # Top->down layout
-                        
-                        # Add zone node
-                        dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
-                        
-                        # Add nameserver nodes and edges
-                        for ns in node['nameservers']:
-                            if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
-                                dot.node(ns, ns)
-                                dot.edge(node['zone'], ns)
-                        
-                        # Save graph
-                        filename = f"{domain.replace('.', '_')}_{i}"
-                        dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                        graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
+            # Generate one graph per unique zone
+            seen_zones = set()
+            for i, node in enumerate(trace):
+                zone = node['zone']
+                if zone in seen_zones:
+                    continue
+                seen_zones.add(zone)
+                
+                dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
+                dot.attr(rankdir='TB')  # Top->down layout
+                
+                # Add zone node
+                dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
+                
+                # Add nameserver nodes and edges
+                for ns in node['nameservers']:
+                    if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
+                        dot.node(ns, ns)
+                        dot.edge(node['zone'], ns)
+                
+                # Save graph
+                filename = f"{domain.replace('.', '_')}_{i}"
+                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
+                graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
         except Exception as e:
             app.logger.error(f"Error generating graphs: {e}")
         
@@ -413,6 +412,13 @@ def api_delegation():
                                         dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
                                     else:
                                         dot.edge(ns, ref, color='blue')
+                
+                # Add mutual reference edges
+                for ns, info in cross_ref_results.items():
+                    if isinstance(info, dict):
+                        for mutual_ref in info.get('mutual_references', []):
+                            if mutual_ref != ns:  # Avoid self-references
+                                dot.edge(ns, mutual_ref, dir='both', color='blue', penwidth='2')
                 
                 # Save graph
                 filename = f"{domain.replace('.', '_')}_domain_report"
