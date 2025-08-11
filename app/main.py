@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response, session
 import dns.resolver
 import dns.message
@@ -129,16 +130,22 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
         if not any(ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')) 
                   for ns in node['nameservers']):
             layer_score += 0.7 * layer_weight
-            breakdown.append(f"+{(0.7 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) is healthy")
+            points = round(0.7 * layer_weight, 1)
+            zone_name = node['zone']
+            breakdown.append("+" + str(points) + " points: Layer " + str(i + 1) + " (" + zone_name + ") is healthy")
         else:
-            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has errors")
+            zone_name = node['zone']
+            breakdown.append("+0 points: Layer " + str(i + 1) + " (" + zone_name + ") has errors")
         
         # Check response time
         if not node.get('is_slow', False):
             layer_score += 0.3 * layer_weight
-            breakdown.append(f"+{(0.3 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) has good response time")
+            points = round(0.3 * layer_weight, 1)
+            zone_name = node['zone']
+            breakdown.append("+" + str(points) + " points: Layer " + str(i + 1) + " (" + zone_name + ") has good response time")
         else:
-            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has slow response")
+            zone_name = node['zone']
+            breakdown.append("+0 points: Layer " + str(i + 1) + " (" + zone_name + ") has slow response")
         
         score += layer_score
     
@@ -154,12 +161,13 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
         
         if glue_issues == 0:
             score += weights['glue']
-            breakdown.append(f"+{weights['glue']} points: All glue records are correct")
+            breakdown.append("+" + str(weights['glue']) + " points: All glue records are correct")
         else:
             deduction = min(glue_issues * 0.5, weights['glue'])
             remaining_points = weights['glue'] - deduction
             score += remaining_points
-            breakdown.append(f"+{remaining_points:.1f} points: {glue_issues} glue record issue{'' if glue_issues == 1 else 's'} found")
+            issue_text = "issue" if glue_issues == 1 else "issues"
+            breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(glue_issues) + " glue record " + issue_text + " found")
     
     # Check cross-reference consistency
     if cross_ref_results:
@@ -168,12 +176,13 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
                             ns not in info['references'])
         if inconsistencies == 0:
             score += weights['crossRef']
-            breakdown.append(f"+{weights['crossRef']} points: All nameserver references are consistent")
+            breakdown.append("+" + str(weights['crossRef']) + " points: All nameserver references are consistent")
         else:
             deduction = min(inconsistencies * 0.5, weights['crossRef'])
             remaining_points = weights['crossRef'] - deduction
             score += remaining_points
-            breakdown.append(f"+{remaining_points:.1f} points: {inconsistencies} inconsistent nameserver reference{'' if inconsistencies == 1 else 's'} found")
+            ref_text = "reference" if inconsistencies == 1 else "references"
+            breakdown.append("+" + str(round(remaining_points, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
     
     # Normalize score to be out of 10
     max_score = 10
@@ -193,12 +202,12 @@ def validate_request():
     # Validate content type for POST requests
     if request.method == 'POST':
         if not request.is_json:
-            app.logger.warning(f"Invalid content type from {get_remote_address()}")
+            app.logger.warning("Invalid content type from " + str(get_remote_address()))
             return jsonify({'error': 'Request must be JSON'}), 415
         
         # Check request size
         if request.content_length and request.content_length > Config.MAX_CONTENT_LENGTH:
-            app.logger.warning(f"Request too large from {get_remote_address()}")
+            app.logger.warning("Request too large from " + str(get_remote_address()))
             return jsonify({'error': 'Request too large'}), 413
         
         # Validate request body
@@ -207,7 +216,7 @@ def validate_request():
             if not data:
                 return jsonify({'error': 'Missing request body'}), 400
         except Exception as e:
-            app.logger.warning(f"Invalid JSON from {get_remote_address()}: {str(e)}")
+            app.logger.warning("Invalid JSON from " + str(get_remote_address()) + ": " + str(e))
             return jsonify({'error': 'Invalid JSON'}), 400
 
 # Enhanced error handling
@@ -215,7 +224,7 @@ def validate_request():
 def handle_exception(e):
     """Handle exceptions with enhanced security and logging."""
     error_id = hashlib.sha256(str(time.time()).encode()).hexdigest()[:8]
-    app.logger.error(f"Error {error_id}: {str(e)}", exc_info=True)
+    app.logger.error("Error " + error_id + ": " + str(e), exc_info=True)
     
     if isinstance(e, dns.resolver.NXDOMAIN):
         return jsonify({'error': 'Domain does not exist'}), 404
@@ -237,7 +246,7 @@ def handle_exception(e):
 @app.errorhandler(429)
 def ratelimit_handler(e):
     """Handle rate limit errors with enhanced logging."""
-    app.logger.warning(f"Rate limit exceeded from {get_remote_address()}")
+    app.logger.warning("Rate limit exceeded from " + str(get_remote_address()))
     return jsonify({
         'error': 'Rate limit exceeded',
         'description': e.description
@@ -319,7 +328,7 @@ def api_delegation():
         verbose = bool(data.get('verbose', False))
         check_glue = bool(data.get('check_glue', True))
         
-        app.logger.info(f"Received delegation request for domain: {domain}")
+        app.logger.info("Received delegation request for domain: " + domain)
         
         # Create custom resolver if specified
         custom_resolver = create_custom_resolver(dns_server)
@@ -337,22 +346,14 @@ def api_delegation():
             if last_level_ns:
                 cross_ref_results = test_last_level_ns_references(last_level_ns, domain)
         except Exception as e:
-            app.logger.warning(f"Additional analysis failed for {domain}: {e}")
+            app.logger.warning("Additional analysis failed for " + domain + ": " + str(e))
         
         # Generate graphs for each level
         graph_urls = []
         try:
-            # Track unique zones to avoid duplicates
-            seen_zones = {}  # zone -> index mapping
             for i, node in enumerate(trace):
                 zone = node['zone']
-                if zone in seen_zones:
-                    # Reuse existing graph URL
-                    graph_urls.append(url_for('static', filename=f'generated/{domain.replace(".", "_")}_{seen_zones[zone]}.png'))
-                    continue
-                
-                seen_zones[zone] = i
-                dot = Digraph(comment=f'DNS Delegation Graph for {zone}')
+                dot = Digraph(comment='DNS Delegation Graph for ' + zone)
                 dot.attr(rankdir='TB')  # Top->down layout
                 
                 # Add zone node
@@ -365,17 +366,17 @@ def api_delegation():
                         dot.edge(zone, ns)
                 
                 # Save graph
-                filename = f"{domain.replace('.', '_')}_{i}"
-                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                graph_urls.append(url_for('static', filename=f'generated/{filename}.png'))
+                filename = domain.replace('.', '_') + '_' + str(i)
+                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                graph_urls.append(url_for('static', filename='generated/' + filename + '.png'))
         except Exception as e:
-            app.logger.error(f"Error generating graphs: {e}")
+            app.logger.error("Error generating graphs: " + str(e))
         
         # Generate Domain Report graph
         domain_report_graph_url = None
         if cross_ref_results:
             try:
-                dot = Digraph(comment=f'Domain Report for {domain}')
+                dot = Digraph(comment='Domain Report for ' + domain)
                 dot.attr(rankdir='TB')  # Top->down layout
                 
                 # Add domain node
@@ -387,8 +388,10 @@ def api_delegation():
                     if isinstance(info, dict):
                         # Condense large sets of nameservers
                         if ns_count > 4 and i == 3 and domain != chain[-1]:
-                            dot.node(f"more_{ns_count-3}", f"... ({ns_count-3} more)", shape='ellipse', style='filled', fillcolor='lightgray')
-                            dot.edge(domain, f"more_{ns_count-3}")
+                            more_node = "more_" + str(ns_count-3)
+                            more_label = "... (" + str(ns_count-3) + " more)"
+                            dot.node(more_node, more_label, shape='ellipse', style='filled', fillcolor='lightgray')
+                            dot.edge(domain, more_node)
                             break
                         color = 'lightgreen' if info.get('self_reference') else 'lightyellow'
                         dot.node(ns, ns, style='filled', fillcolor=color)
@@ -420,17 +423,17 @@ def api_delegation():
                                             dot.edge(ns, ref, color='blue')
                 
                 # Save graph
-                filename = f"{domain.replace('.', '_')}_domain_report"
-                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                domain_report_graph_url = url_for('static', filename=f'generated/{filename}.png')
+                filename = domain.replace('.', '_') + "_domain_report"
+                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                domain_report_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
-                app.logger.error(f"Error generating Domain Report graph: {e}")
+                app.logger.error("Error generating Domain Report graph: " + str(e))
         
         # Generate Glue Analysis graph
         glue_analysis_graph_url = None
         if glue_results:
             try:
-                dot = Digraph(comment=f'Glue Analysis for {domain}')
+                dot = Digraph(comment='Glue Analysis for ' + domain)
                 dot.attr(rankdir='TB')  # Top->down layout
                 
                 for zone, data in glue_results.items():
@@ -451,11 +454,11 @@ def api_delegation():
                                 dot.edge(ns, ip, color='green')
                 
                 # Save graph
-                filename = f"{domain.replace('.', '_')}_glue_analysis"
-                dot.render(f"app/static/generated/{filename}", format='png', cleanup=True)
-                glue_analysis_graph_url = url_for('static', filename=f'generated/{filename}.png')
+                filename = domain.replace('.', '_') + "_glue_analysis"
+                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                glue_analysis_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
-                app.logger.error(f"Error generating Glue Analysis graph: {e}")
+                app.logger.error("Error generating Glue Analysis graph: " + str(e))
         
         return jsonify({
             'domain': domain,
@@ -471,7 +474,7 @@ def api_delegation():
             'glue_analysis_graph_url': glue_analysis_graph_url
         })
     except Exception as e:
-        app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")
+        app.logger.error("Error processing delegation request for " + domain + ": " + str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/trace/<domain>', methods=['GET'])
@@ -501,7 +504,7 @@ def api_trace_domain(domain):
             'verbose': verbose
         })
     except Exception as e:
-        app.logger.error(f"Error tracing domain {domain}: {str(e)}")
+        app.logger.error("Error tracing domain " + domain + ": " + str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/export/<domain>', methods=['GET'])
@@ -543,7 +546,7 @@ def export_data(domain):
             }
             response = make_response(jsonify(data))
             response.headers['Content-Type'] = 'application/json'
-            response.headers['Content-Disposition'] = f'attachment; filename={domain}_dns_analysis.json'
+            response.headers['Content-Disposition'] = 'attachment; filename=' + domain + '_dns_analysis.json'
             return response
             
         elif format == 'csv':
@@ -596,8 +599,8 @@ def export_data(domain):
             # Write health score
             health_score = calculate_health_score(trace, glue_results, cross_ref_results)
             writer.writerow(['Health Score'])
-            writer.writerow(['Score:', f"{health_score['score']}/{health_score['max_score']}"])
-            writer.writerow(['Percentage:', f"{health_score['percentage']}%"])
+            writer.writerow(['Score:', str(health_score['score']) + '/' + str(health_score['max_score'])])
+            writer.writerow(['Percentage:', str(health_score['percentage']) + '%'])
             writer.writerow([])
             writer.writerow(['Score Breakdown'])
             for detail in health_score['breakdown']:
@@ -605,13 +608,13 @@ def export_data(domain):
             
             response = make_response(output.getvalue())
             response.headers['Content-Type'] = 'text/csv'
-            response.headers['Content-Disposition'] = f'attachment; filename={domain}_dns_analysis.csv'
+            response.headers['Content-Disposition'] = 'attachment; filename=' + domain + '_dns_analysis.csv'
             return response
         else:
             return jsonify({'error': 'Invalid export format. Use "json" or "csv"'}), 400
             
     except Exception as e:
-        app.logger.error(f"Error exporting data for {domain}: {str(e)}")
+        app.logger.error("Error exporting data for " + domain + ": " + str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/nameservers/<domain>', methods=['GET'])
@@ -657,7 +660,7 @@ def api_nameservers(domain):
             'dns_server_used': dns_server
         })
     except Exception as e:
-        app.logger.error(f"Error getting nameservers for {domain}: {str(e)}")
+        app.logger.error("Error getting nameservers for " + domain + ": " + str(e))
         return jsonify({'error': str(e)}), 500
 
 
@@ -698,7 +701,7 @@ def check_glue_records(domain, custom_resolver=None):
         # Skip glue record checking for root (.) zone only
         if i == 0:  # 0 = root only
             zone_result['status'] = 'skipped'
-            zone_result['glue_issues'].append(f"Glue record checking skipped for {zone} (root level)")
+            zone_result['glue_issues'].append("Glue record checking skipped for " + zone + " (root level)")
             glue_results[zone] = zone_result
             continue
         
@@ -774,7 +777,7 @@ def check_glue_records(domain, custom_resolver=None):
                             continue  # Try next parent nameserver
                 
                 except Exception as e:
-                    ns_glue['issues'].append(f"Error checking glue records from parent zone: {e}")
+                    ns_glue['issues'].append("Error checking glue records from parent zone: " + str(e))
                 
                 # Get resolved A and AAAA records for comparison
                 try:
@@ -816,17 +819,17 @@ def check_glue_records(domain, custom_resolver=None):
                 
                 # Add issues to zone-level issues
                 if ns_glue['issues']:
-                    zone_result['glue_issues'].extend([f"{ns}: {issue}" for issue in ns_glue['issues']])
+                    zone_result['glue_issues'].extend([ns + ": " + issue for issue in ns_glue['issues']])
             
         except dns.resolver.NXDOMAIN:
             zone_result['status'] = 'nxdomain'
-            zone_result['glue_issues'].append(f"Zone {zone} does not exist")
+            zone_result['glue_issues'].append("Zone " + zone + " does not exist")
         except dns.resolver.NoAnswer:
             zone_result['status'] = 'no_ns'
-            zone_result['glue_issues'].append(f"No NS records found for {zone}")
+            zone_result['glue_issues'].append("No NS records found for " + zone)
         except Exception as e:
             zone_result['status'] = 'error'
-            zone_result['glue_issues'].append(f"Error querying {zone}: {e}")
+            zone_result['glue_issues'].append("Error querying " + zone + ": " + str(e))
         
         glue_results[zone] = zone_result
     
@@ -860,7 +863,7 @@ def test_last_level_ns_references(nameservers, domain):
                                 if ref_ns.rstrip('.') == ns.rstrip('.'):
                                     results[ns]['self_reference'] = True
         except Exception as e:
-            app.logger.warning(f"Error querying nameserver {ns} for {domain}: {e}")
+            app.logger.warning("Error querying nameserver " + ns + " for " + domain + ": " + str(e))
             results[ns] = {'references': set(), 'error': str(e)}
     
     # Convert sets to lists for JSON serialization and ensure all nameservers are included

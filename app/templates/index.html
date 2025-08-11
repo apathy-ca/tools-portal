@@ -712,21 +712,7 @@ if __name__ == "__main__":
                 
                 if (data.graph_urls && data.graph_urls.length) {
                     let html = '';
-                    
-                    // Create array of indices for graph display order
-                    let graphIndices = [];
-                    for (let i = 0; i < data.graph_urls.length; i++) {
-                        graphIndices.push(i);
-                    }
-                    
-                    // Reverse the order unless rootFirst is true
                     const rootFirst = document.getElementById('rootFirstCheckbox').checked;
-                    if (!rootFirst) {
-                        graphIndices.reverse();
-                    }
-                    
-                    // Show domain report and glue records after the domain level but before other levels
-                    let domainLevelIndex = data.trace.length - 1;
                     
                     // Show Domain Report first
                     if (data.domain_report_graph_url) {
@@ -741,50 +727,18 @@ if __name__ == "__main__":
                         html += renderGlueRecords(data.glue_results, check_glue);
                     }
                     
-                    // Show domain level
-                    const domainUrl = data.graph_urls[domainLevelIndex];
-                    const domainLayerName = data.trace[domainLevelIndex].zone;
-                    html += `<div style="margin-bottom: 2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                <h3>${domainLayerName}</h3>
-                                <div style="text-align: center;">
-                                    <img src="${domainUrl}" alt="DNS Delegation Graph ${domainLayerName}" style="max-width:100%; height: auto;">
-                                </div>`;
-                    
-                    // Add verbose info section if available
-                    if (data.trace[domainLevelIndex].verbose) {
-                        html += `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top: 15px;">
-                                    <details>
-                                        <summary style="cursor: pointer; font-weight: bold; color: #666;">Technical Details</summary>
-                                        <pre style="background:#f0f0f0; padding:10px; white-space: pre-wrap; margin-top: 10px; border-radius: 4px;">${data.trace[domainLevelIndex].verbose}</pre>
-                                    </details>
-                                 </div>`;
-                    }
-                    html += `</div>`;
-                    
-                    // Show remaining levels (except domain level)
-                    for (let i = domainLevelIndex - 1; i >= 0; i--) {
-                        const url = data.graph_urls[i];
-                        const layerName = data.trace[i].zone;
-                        const isRoot = layerName === '.';
-                        
-                        html += `<div style="margin-bottom: 2em; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
-                                    <h3>${isRoot ? 'Root Servers (.)' : layerName}</h3>
-                                    <div style="text-align: center;">
-                                        <img src="${url}" alt="DNS Delegation Graph ${layerName}" style="max-width:100%; height: auto;">
-                                    </div>`;
-                        
-                        // Add verbose info section if available
-                        if (data.trace[i].verbose) {
-                            html += `<div class="verbose-section" style="display: ${verbose ? 'block' : 'none'}; margin-top: 15px;">
-                                        <details>
-                                            <summary style="cursor: pointer; font-weight: bold; color: #666;">Technical Details</summary>
-                                            <pre style="background:#f0f0f0; padding:10px; white-space: pre-wrap; margin-top: 10px; border-radius: 4px;">${data.trace[i].verbose}</pre>
-                                        </details>
-                                     </div>`;
-                        }
-                        html += `</div>`;
+                    // Create array of indices for graph display order
+                    let graphIndices = [];
+                    for (let i = 0; i < data.graph_urls.length; i++) {
+                        graphIndices.push(i);
                     }
                     
+                    // Reverse the order unless rootFirst is true
+                    if (!rootFirst) {
+                        graphIndices.reverse();
+                    }
+                    
+                    // Show delegation graphs
                     graphIndices.forEach((idx) => {
                         const url = data.graph_urls[idx];
                         const layerName = data.trace && data.trace[idx] ? data.trace[idx].zone : `Layer ${idx + 1}`;
