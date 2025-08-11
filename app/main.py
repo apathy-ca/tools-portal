@@ -570,13 +570,14 @@ def test_last_level_ns_references(ns_list, domain):
         results[ns] = ns_result
     return results
 
-def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
+def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None, glue_data=None):
     """
     Build a detailed graphviz graph visualizing the cross references among last-level nameservers.
     Shows arrows between nameservers that reference each other.
     Marks servers that do not reference themselves with red border.
     Includes a node for the domain pointing to its nameservers.
     Handles broken/unreachable nameservers gracefully.
+    Enhanced with glue record information when available.
     """
     dot = Digraph(format='png')
     dot.attr(rankdir='LR')
@@ -597,13 +598,14 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
     if domain:
         dot.node(domain, domain, shape='box', style='filled', fillcolor='#ccccff')
 
-    # Add nodes with colors based on their status
+    # Add nodes with colors based on their status and glue record information
     for server in all_servers:
         if server in cross_ref_results:
             # This is a nameserver we tested
             info = cross_ref_results[server]
             status = info.get('status', 'unknown')
             
+            # Base colors based on reachability status
             if status == 'reachable':
                 fillcolor = '#eaffea'  # green - working
                 color = 'black'
@@ -616,8 +618,46 @@ def build_cross_ref_graph(cross_ref_results, domain=None, prefix=None):
             else:
                 fillcolor = '#f0f0f0'  # gray - unknown
                 color = 'gray'
+            
+            # Enhance with glue record information if available
+            node_label = server
+            glue_info = []
+            if glue_data and server in glue_data:
+                glue_record = glue_data[server]
                 
-            dot.node(server, server, shape='ellipse', style='filled', fillcolor=fillcolor, color=color)
+                # Add glue record indicators to the label
+                if glue_record.get('expected_glue', False):
+                    if glue_record.get('has_glue_a', False):
+                        glue_info.append('A✓')
+                    else:
+                        glue_info.append('A✗')
+                        # Change color to indicate missing glue
+                        if status == 'reachable':
+                            fillcolor = '#ffeeaa'  # yellow-ish for missing glue
+                            color = 'darkorange'
+                    
+                    if glue_record.get('has_glue_aaaa', False):
+                        glue_info.append('AAAA✓')
+                    elif glue_record.get('resolved_aaaa_records'):
+                        glue_info.append('AAAA✗')
+                        # Change color to indicate missing glue
+                        if status == 'reachable':
+                            fillcolor = '#ffeeaa'  # yellow-ish for missing glue
+                            color = 'darkorange'
+                
+                # Check for glue record issues
+                if glue_record.get('issues'):
+                    # Add warning indicator for any glue issues
+                    glue_info.append('⚠️')
+                    if status == 'reachable':
+                        fillcolor = '#ffd4aa'  # orange-ish for glue issues
+                        color = 'red'
+                
+                # Add glue info to label if any
+                if glue_info:
+                    node_label = f"{server}\\n[{' '.join(glue_info)}]"
+                
+            dot.node(server, node_label, shape='ellipse', style='filled', fillcolor=fillcolor, color=color)
         else:
             # This is a referenced server we didn't test directly
             dot.node(server, server, shape='ellipse', style='filled', fillcolor='#eaffea')
@@ -723,7 +763,17 @@ def api_delegation():
             if last_level_ns:
                 try:
                     cross_ref_results = test_last_level_ns_references(last_level_ns, domain)
-                    cross_ref_graph_url = build_cross_ref_graph(cross_ref_results, domain, prefix)
+                    # Always get glue records for cross-reference graph enhancement
+                    domain_glue_results = {}
+                    try:
+                        full_glue_results = check_glue_records(domain, custom_resolver)
+                        # Extract glue info for the final domain level
+                        if domain in full_glue_results:
+                            domain_glue_results = full_glue_results[domain].get('glue_records', {})
+                    except Exception as e:
+                        app.logger.warning(f"Glue record analysis for cross-ref failed for {domain}: {e}")
+                    
+                    cross_ref_graph_url = build_cross_ref_graph(cross_ref_results, domain, prefix, domain_glue_results)
                 except Exception as e:
                     # If cross-reference analysis fails, continue without it
                     app.logger.warning(f"Cross-reference analysis failed for {domain}: {e}")
