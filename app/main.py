@@ -279,7 +279,7 @@ def ratelimit_handler(e):
 
 @app.after_request
 def add_security_headers(response):
-    """Add comprehensive security headers."""
+    """Add comprehensive security headers and disable caching for DNS data."""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -299,6 +299,13 @@ def add_security_headers(response):
     )
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    
+    # Disable caching for all DNS-related API endpoints
+    if request.endpoint and request.endpoint.startswith('api_'):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
     return response
 
 @app.route('/', methods=['GET'])
@@ -331,7 +338,6 @@ def get_dns_servers():
 
 @app.route('/api/delegation', methods=['POST'])
 @limiter.limit(Config.RATELIMIT_API_DEFAULT)
-@cache.cached(timeout=0)  # Disable caching to ensure fresh results
 def api_delegation():
     """API endpoint for DNS delegation analysis with visualizations."""
     try:
@@ -494,6 +500,7 @@ def api_delegation():
             'domain': domain,
             'chain': chain_str,
             'dns_server_used': dns_server,
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
             'trace': trace,
             'timing_info': timing,
             'glue_results': glue_results,
@@ -530,6 +537,7 @@ def api_trace_domain(domain):
             'trace': trace,
             'chain': chain_str,
             'dns_server_used': dns_server,
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
             'timing_info': timing,
             'verbose': verbose
         })
