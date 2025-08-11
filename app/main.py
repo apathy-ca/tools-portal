@@ -109,12 +109,11 @@ def create_custom_resolver(dns_server):
 
 def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
     """
-    Calculate DNS health score focused ONLY on the target domain.
-    Ignores root and TLD server health - only cares about the domain entered.
+    Calculate DNS health score with layered approach:
+    - 1 point for each delegation layer between TLD and target domain
+    - Heavier penalties for errors at target domain and parent domain
+    - Ignore "unnecessary glue records" as they're helpful additional data
     """
-    score = 10.0  # Start with perfect score
-    breakdown = []
-    
     if not trace:
         return {
             'score': 0,
@@ -123,27 +122,42 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             'percentage': 0
         }
     
+    # Calculate delegation layers (skip root and TLD)
+    delegation_layers = len(trace) - 2  # Subtract root (.) and TLD
+    if delegation_layers < 1:
+        delegation_layers = 1  # At minimum, we have the target domain
+    
+    # Start with base score: 1 point per delegation layer
+    base_score = delegation_layers
+    score = base_score
+    max_score = base_score + 5  # Base + up to 5 bonus points for perfect config
+    breakdown = []
+    
+    breakdown.append(f"+{base_score} point(s): {delegation_layers} delegation layer(s) functional")
+    
     # Get the target domain (last zone in the trace)
     target_domain = trace[-1]['zone']
     
-    # 1. Check if the target domain's nameservers are reachable
+    # 1. Check target domain nameserver health (heavy penalty)
     target_nameservers = trace[-1]['nameservers']
-    broken_nameservers = []
+    broken_target_ns = []
     
     for ns in target_nameservers:
         if ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
-            broken_nameservers.append(ns)
+            broken_target_ns.append(ns)
     
-    if broken_nameservers:
-        penalty = len(broken_nameservers) * 2.0  # 2 points per broken nameserver
+    if broken_target_ns:
+        penalty = len(broken_target_ns) * 2.0  # Heavy penalty for target domain issues
         score -= penalty
-        breakdown.append("-" + str(penalty) + " points: " + str(len(broken_nameservers)) + " nameserver(s) unreachable")
-        for ns in broken_nameservers:
-            breakdown.append("  • " + ns)
+        breakdown.append(f"-{penalty} points: {len(broken_target_ns)} target domain nameserver(s) broken")
+        for ns in broken_target_ns:
+            breakdown.append(f"  • {ns}")
     else:
-        breakdown.append("+0 points: All nameservers are reachable")
+        bonus = 2.0
+        score += bonus
+        breakdown.append(f"+{bonus} points: All target domain nameservers reachable")
     
-    # 2. Check cross-reference consistency (nameservers must reference each other)
+    # 2. Check cross-reference consistency at target domain (medium penalty)
     if cross_ref_results:
         broken_ns_count = 0
         missing_self_ref_count = 0
@@ -171,53 +185,59 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
                         missing_cross_ref_count += 1
                         break  # Only count once per nameserver
         
-        # Apply penalties
+        # Apply penalties for cross-reference issues
         if broken_ns_count > 0:
-            penalty = broken_ns_count * 3.0  # 3 points per broken nameserver
+            penalty = broken_ns_count * 1.5  # Medium penalty for DNS errors
             score -= penalty
-            breakdown.append("-" + str(penalty) + " points: " + str(broken_ns_count) + " nameserver(s) have DNS errors")
+            breakdown.append(f"-{penalty} points: {broken_ns_count} nameserver(s) have DNS query errors")
         
         if missing_self_ref_count > 0:
-            penalty = missing_self_ref_count * 1.0  # 1 point per missing self-reference
+            penalty = missing_self_ref_count * 0.5  # Light penalty for missing self-reference
             score -= penalty
-            breakdown.append("-" + str(penalty) + " points: " + str(missing_self_ref_count) + " nameserver(s) don't reference themselves")
+            breakdown.append(f"-{penalty} points: {missing_self_ref_count} nameserver(s) don't reference themselves")
         
         if missing_cross_ref_count > 0:
-            penalty = missing_cross_ref_count * 0.5  # 0.5 points per missing cross-reference
+            penalty = missing_cross_ref_count * 0.25  # Very light penalty for missing cross-references
             score -= penalty
-            breakdown.append("-" + str(penalty) + " points: " + str(missing_cross_ref_count) + " nameserver(s) missing cross-references")
+            breakdown.append(f"-{penalty} points: {missing_cross_ref_count} nameserver(s) missing cross-references")
         
+        # Bonus for perfect cross-references
         if broken_ns_count == 0 and missing_self_ref_count == 0 and missing_cross_ref_count == 0:
-            breakdown.append("+0 points: All nameserver references are correct")
+            bonus = 2.0
+            score += bonus
+            breakdown.append(f"+{bonus} points: Perfect nameserver cross-references")
     
-    # 3. Check glue records ONLY for the target domain
+    # 3. Check glue records for target domain (light penalty, ignore "unnecessary" glue)
     if glue_results and target_domain in glue_results:
         domain_glue = glue_results[target_domain]
-        glue_issues = 0
+        serious_glue_issues = 0
         
         for ns, ns_data in domain_glue.get('glue_records', {}).items():
             issues = ns_data.get('issues', [])
             for issue in issues:
-                if "Missing glue" in issue:
-                    glue_issues += 1
-                elif "don't match" in issue:
-                    glue_issues += 1
+                # Only penalize serious glue issues, not "unnecessary" ones
+                if "Missing glue" in issue or "don't match" in issue:
+                    serious_glue_issues += 1
+                # Ignore "Unnecessary glue records" as they're helpful additional data
         
-        if glue_issues > 0:
-            penalty = glue_issues * 1.0  # 1 point per glue issue
+        if serious_glue_issues > 0:
+            penalty = serious_glue_issues * 0.5  # Light penalty for glue issues
             score -= penalty
-            breakdown.append("-" + str(penalty) + " points: " + str(glue_issues) + " glue record issue(s)")
+            breakdown.append(f"-{penalty} points: {serious_glue_issues} serious glue record issue(s)")
         else:
-            breakdown.append("+0 points: Glue records are correct")
+            bonus = 1.0
+            score += bonus
+            breakdown.append(f"+{bonus} point: Glue records are correct")
     
-    # Ensure score doesn't go below 0
+    # Ensure score doesn't go below 0 and round appropriately
     score = max(0, round(score, 1))
+    max_score = round(max_score, 1)
     
     return {
         'score': score,
-        'max_score': 10,
+        'max_score': max_score,
         'breakdown': breakdown,
-        'percentage': (score / 10) * 100
+        'percentage': (score / max_score) * 100 if max_score > 0 else 0
     }
 
 # Request validation middleware
