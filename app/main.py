@@ -342,18 +342,27 @@ def api_delegation():
         # Generate graphs for each level
         graph_urls = []
         try:
+            # Track unique zones to avoid duplicates
+            seen_zones = {}  # zone -> index mapping
             for i, node in enumerate(trace):
-                dot = Digraph(comment=f'DNS Delegation Graph for {node["zone"]}')
+                zone = node['zone']
+                if zone in seen_zones:
+                    # Reuse existing graph URL
+                    graph_urls.append(url_for('static', filename=f'generated/{domain.replace(".", "_")}_{seen_zones[zone]}.png'))
+                    continue
+                
+                seen_zones[zone] = i
+                dot = Digraph(comment=f'DNS Delegation Graph for {zone}')
                 dot.attr(rankdir='TB')  # Top->down layout
                 
                 # Add zone node
-                dot.node(node['zone'], node['zone'], shape='box', style='filled', fillcolor='lightblue')
+                dot.node(zone, zone, shape='box', style='filled', fillcolor='lightblue')
                 
                 # Add nameserver nodes and edges
                 for ns in node['nameservers']:
                     if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')):
                         dot.node(ns, ns)
-                        dot.edge(node['zone'], ns)
+                        dot.edge(zone, ns)
                 
                 # Save graph
                 filename = f"{domain.replace('.', '_')}_{i}"
@@ -386,29 +395,29 @@ def api_delegation():
                         dot.edge(domain, ns)
                 
                 # Add edges for references
+                processed_pairs = set()  # Track which pairs of nameservers we've processed
                 for ns, info in cross_ref_results.items():
                     if isinstance(info, dict):
+                        ns_normalized = ns.rstrip('.')
                         refs = info.get('references', [])
                         for ref in refs:
-                            ref = ref.rstrip('.')  # Normalize reference name
-                            ns_normalized = ns.rstrip('.')  # Normalize nameserver name
+                            ref = ref.rstrip('.')
                             if ref == ns_normalized:  # Self-reference
                                 dot.edge(ns, ns, dir='both', color='green', label='self-ref')
                             elif ref in cross_ref_results:
-                                ref_info = cross_ref_results[ref]
-                                if isinstance(ref_info, dict):
-                                    ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
-                                    if ns_normalized in ref_refs:
-                                        dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
-                                    else:
-                                        dot.edge(ns, ref, color='blue')
-                
-                # Add mutual reference edges
-                for ns, info in cross_ref_results.items():
-                    if isinstance(info, dict):
-                        for mutual_ref in info.get('mutual_references', []):
-                            if mutual_ref != ns:  # Avoid self-references
-                                dot.edge(ns, mutual_ref, dir='both', color='blue', penwidth='2')
+                                # Create a unique identifier for this nameserver pair
+                                pair_id = tuple(sorted([ns_normalized, ref]))
+                                if pair_id not in processed_pairs:
+                                    processed_pairs.add(pair_id)
+                                    ref_info = cross_ref_results[ref]
+                                    if isinstance(ref_info, dict):
+                                        ref_refs = [r.rstrip('.') for r in ref_info.get('references', [])]
+                                        if ns_normalized in ref_refs:
+                                            # Mutual reference - both servers reference each other
+                                            dot.edge(ns, ref, dir='both', color='blue', penwidth='2')
+                                        else:
+                                            # One-way reference
+                                            dot.edge(ns, ref, color='blue')
                 
                 # Save graph
                 filename = f"{domain.replace('.', '_')}_domain_report"
