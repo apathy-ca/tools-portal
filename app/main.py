@@ -1,4 +1,426 @@
-[Previous content up to the security headers]
+from flask import Flask, request, jsonify, render_template, send_from_directory, url_for, make_response, session
+import dns.resolver
+import dns.message
+import dns.query
+import dns.rdatatype
+import dns.dnssec
+import os
+from graphviz import Digraph
+import re
+import hashlib
+import time
+import csv
+import json
+import io
+from flask_caching import Cache
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_compress import Compress
+from config import Config
+import logging
+from logging.handlers import RotatingFileHandler
+import html
+
+app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.config.from_object(Config)
+
+# Initialize compression
+compress = Compress(app)
+
+# Configure cache
+cache = Cache(app)
+
+# Enhanced rate limiting with IP tracking
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=[Config.RATELIMIT_DEFAULT],
+    storage_uri=Config.RATELIMIT_STORAGE_URL,
+    strategy=Config.RATELIMIT_STRATEGY
+)
+
+# Configure logging with enhanced security
+import sys
+
+if not app.debug:
+    file_handler = RotatingFileHandler(
+        Config.LOG_FILE,
+        maxBytes=Config.LOG_MAX_BYTES,
+        backupCount=Config.LOG_BACKUP_COUNT,
+        delay=True  # Only create log file when needed
+    )
+    file_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        app.logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = handle_exception
+
+    app.logger.info('DNS By Eye startup')
+
+# Configure DNS resolver with timeouts
+resolver = dns.resolver.Resolver()
+resolver.timeout = Config.DNS_TIMEOUT
+resolver.lifetime = Config.DNS_LIFETIME
+
+# DNS timeout constant for direct queries
+DNS_TIMEOUT = Config.DNS_TIMEOUT
+
+# Input validation constants
+DOMAIN_REGEX = re.compile(r'^(?=.{4,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-_]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+IP_REGEX = re.compile(r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
+MAX_DOMAIN_LENGTH = 253
+MAX_DNS_SERVERS = ['system', '8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '9.9.9.9', '208.67.222.222', '208.67.220.220']
+
+def is_valid_domain(domain):
+    """Validate domain name format and length."""
+    if not domain or len(domain) > MAX_DOMAIN_LENGTH:
+        return False
+    try:
+        return bool(DOMAIN_REGEX.match(domain.strip('.')))
+    except Exception:
+        return False
+
+def is_valid_dns_server(dns_server):
+    """Validate DNS server is either 'system' or a valid IP from our allowed list."""
+    if not dns_server:
+        return False
+    if dns_server == 'system':
+        return True
+    return dns_server in MAX_DNS_SERVERS and bool(IP_REGEX.match(dns_server))
+
+def create_custom_resolver(dns_server):
+    """Create a custom DNS resolver with specified server."""
+    if not dns_server or dns_server == 'system':
+        return None  # Use system default
+    
+    custom_resolver = dns.resolver.Resolver()
+    custom_resolver.nameservers = [dns_server]
+    custom_resolver.timeout = Config.DNS_TIMEOUT
+    custom_resolver.lifetime = Config.DNS_LIFETIME
+    return custom_resolver
+
+def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
+    """Calculate DNS health score and provide detailed breakdown."""
+    score = 0
+    breakdown = []
+    
+    # Weights for different aspects
+    weights = {
+        'root': 1,    # Root servers
+        'tld': 1,     # TLD servers
+        'domain': 3,  # Domain nameservers
+        'glue': 3,    # Glue records
+        'crossRef': 2 # Cross-reference consistency
+    }
+    
+    # Check each layer and add points
+    for i, node in enumerate(trace):
+        layer_weight = weights['root'] if i == 0 else (weights['tld'] if i == 1 else weights['domain'])
+        layer_score = 0
+        
+        # Check for DNS errors
+        if not any(ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:')) 
+                  for ns in node['nameservers']):
+            layer_score += 0.7 * layer_weight
+            breakdown.append(f"+{(0.7 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) is healthy")
+        else:
+            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has errors")
+        
+        # Check response time
+        if not node.get('is_slow', False):
+            layer_score += 0.3 * layer_weight
+            breakdown.append(f"+{(0.3 * layer_weight):.1f} points: Layer {i + 1} ({node['zone']}) has good response time")
+        else:
+            breakdown.append(f"+0 points: Layer {i + 1} ({node['zone']}) has slow response")
+        
+        score += layer_score
+    
+    # Check glue records
+    if glue_results:
+        # Only count actual glue record issues (ignore unnecessary glue warnings)
+        glue_issues = 0
+        for zone in glue_results.values():
+            for issue in zone.get('glue_issues', []):
+                # Skip unnecessary glue record warnings
+                if not "Unnecessary glue records" in issue:
+                    glue_issues += 1
+        
+        if glue_issues == 0:
+            score += weights['glue']
+            breakdown.append(f"+{weights['glue']} points: All glue records are correct")
+        else:
+            deduction = min(glue_issues * 0.5, weights['glue'])
+            remaining_points = weights['glue'] - deduction
+            score += remaining_points
+            breakdown.append(f"+{remaining_points:.1f} points: {glue_issues} glue record issue{'' if glue_issues == 1 else 's'} found")
+    
+    # Check cross-reference consistency
+    if cross_ref_results:
+        inconsistencies = sum(1 for ns, info in cross_ref_results.items()
+                            if isinstance(info, dict) and info.get('references') and 
+                            ns not in info['references'])
+        if inconsistencies == 0:
+            score += weights['crossRef']
+            breakdown.append(f"+{weights['crossRef']} points: All nameserver references are consistent")
+        else:
+            deduction = min(inconsistencies * 0.5, weights['crossRef'])
+            remaining_points = weights['crossRef'] - deduction
+            score += remaining_points
+            breakdown.append(f"+{remaining_points:.1f} points: {inconsistencies} inconsistent nameserver reference{'' if inconsistencies == 1 else 's'} found")
+    
+    # Normalize score to be out of 10
+    max_score = 10
+    score = min(10, round(score, 1))
+    
+    return {
+        'score': score,
+        'max_score': max_score,
+        'breakdown': breakdown,
+        'percentage': (score / max_score) * 100
+    }
+
+# Request validation middleware
+@app.before_request
+def validate_request():
+    """Validate and sanitize incoming requests."""
+    # Validate content type for POST requests
+    if request.method == 'POST':
+        if not request.is_json:
+            app.logger.warning(f"Invalid content type from {get_remote_address()}")
+            return jsonify({'error': 'Request must be JSON'}), 415
+        
+        # Check request size
+        if request.content_length and request.content_length > Config.MAX_CONTENT_LENGTH:
+            app.logger.warning(f"Request too large from {get_remote_address()}")
+            return jsonify({'error': 'Request too large'}), 413
+        
+        # Validate request body
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Missing request body'}), 400
+        except Exception as e:
+            app.logger.warning(f"Invalid JSON from {get_remote_address()}: {str(e)}")
+            return jsonify({'error': 'Invalid JSON'}), 400
+
+# Enhanced error handling
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle exceptions with enhanced security and logging."""
+    error_id = hashlib.sha256(str(time.time()).encode()).hexdigest()[:8]
+    app.logger.error(f"Error {error_id}: {str(e)}", exc_info=True)
+    
+    if isinstance(e, dns.resolver.NXDOMAIN):
+        return jsonify({'error': 'Domain does not exist'}), 404
+    elif isinstance(e, dns.resolver.NoAnswer):
+        return jsonify({'error': 'No DNS records found'}), 404
+    elif isinstance(e, dns.resolver.Timeout):
+        return jsonify({'error': 'DNS query timed out'}), 504
+    elif isinstance(e, dns.resolver.NoNameservers):
+        return jsonify({'error': 'No nameservers available'}), 502
+    elif isinstance(e, dns.dnssec.ValidationFailure):
+        return jsonify({'error': 'DNSSEC validation failed'}), 400
+    
+    # Generic error response (don't expose internal details)
+    return jsonify({
+        'error': 'An unexpected error occurred',
+        'error_id': error_id
+    }), 500
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit errors with enhanced logging."""
+    app.logger.warning(f"Rate limit exceeded from {get_remote_address()}")
+    return jsonify({
+        'error': 'Rate limit exceeded',
+        'description': e.description
+    }), 429
+
+@app.after_request
+def add_security_headers(response):
+    """Add comprehensive security headers."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "connect-src 'self'; "
+        "font-src 'self'; "
+        "frame-src 'none'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'; "
+        "base-uri 'self'; "
+        "object-src 'none'"
+    )
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
+
+@app.route('/', methods=['GET'])
+def index():
+    """Serve the main application page."""
+    return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files with security headers."""
+    return send_from_directory(app.static_folder, filename)
+
+@app.route('/api/health', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def health_check():
+    """Health check endpoint."""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+    })
+
+@app.route('/api/delegation', methods=['POST'])
+@limiter.limit(Config.RATELIMIT_API_DEFAULT)
+@cache.memoize(timeout=300)
+def api_delegation():
+    """API endpoint for DNS delegation analysis with visualizations."""
+    try:
+        # Validate request body
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Missing request body'}), 400
+            
+        # Input validation
+        domain = data.get('domain', '').strip().lower()
+        if not domain:
+            return jsonify({'error': 'Domain is required'}), 400
+        if not is_valid_domain(domain):
+            return jsonify({'error': 'Invalid domain format'}), 400
+            
+        dns_server = data.get('dns_server', 'system')
+        if not is_valid_dns_server(dns_server):
+            return jsonify({'error': 'Invalid DNS server'}), 400
+            
+        verbose = bool(data.get('verbose', False))
+        check_glue = bool(data.get('check_glue', True))
+        
+        app.logger.info(f"Received delegation request for domain: {domain}")
+        
+        # Create custom resolver if specified
+        custom_resolver = create_custom_resolver(dns_server)
+        trace, chain, timing = trace_delegation(domain, verbose=verbose, custom_resolver=custom_resolver, debug=True)
+        chain_str = " → ".join(chain)
+
+        # Get glue records and cross-reference data for health score
+        glue_results = {}
+        cross_ref_results = {}
+        try:
+            if check_glue:
+                glue_results = check_glue_records(domain, custom_resolver)
+            last_level_ns = [ns for ns in trace[-1]['nameservers'] 
+                           if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
+            if last_level_ns:
+                cross_ref_results = test_last_level_ns_references(last_level_ns, domain)
+        except Exception as e:
+            app.logger.warning(f"Additional analysis failed for {domain}: {e}")
+        
+        return jsonify({
+            'domain': domain,
+            'chain': chain_str,
+            'dns_server_used': dns_server,
+            'trace': trace,
+            'timing_info': timing,
+            'glue_results': glue_results,
+            'cross_ref_results': cross_ref_results,
+            'health_score': calculate_health_score(trace, glue_results, cross_ref_results)
+        })
+    except Exception as e:
+        app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trace/<domain>', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def api_trace_domain(domain):
+    """API endpoint for DNS delegation trace without visualizations."""
+    if not is_valid_domain(domain):
+        return jsonify({'error': 'Invalid domain format'}), 400
+        
+    verbose = request.args.get('verbose', 'false').lower() == 'true'
+    dns_server = request.args.get('dns_server', 'system')
+    
+    if not is_valid_dns_server(dns_server):
+        return jsonify({'error': 'Invalid DNS server'}), 400
+    
+    try:
+        custom_resolver = create_custom_resolver(dns_server)
+        trace, chain, timing = trace_delegation(domain, verbose=verbose, custom_resolver=custom_resolver, debug=True)
+        chain_str = " → ".join(chain)
+        
+        return jsonify({
+            'domain': domain,
+            'trace': trace,
+            'chain': chain_str,
+            'dns_server_used': dns_server,
+            'timing_info': timing,
+            'verbose': verbose
+        })
+    except Exception as e:
+        app.logger.error(f"Error tracing domain {domain}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nameservers/<domain>', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def api_nameservers(domain):
+    """API endpoint to get nameservers for a domain."""
+    if not is_valid_domain(domain):
+        return jsonify({'error': 'Invalid domain format'}), 400
+        
+    dns_server = request.args.get('dns_server', 'system')
+    if not is_valid_dns_server(dns_server):
+        return jsonify({'error': 'Invalid DNS server'}), 400
+    
+    try:
+        custom_resolver = create_custom_resolver(dns_server)
+        query_resolver = custom_resolver if custom_resolver else resolver
+        
+        ns_records = query_resolver.resolve(domain, 'NS')
+        ns_list = [r.to_text() for r in ns_records]
+        
+        # Get A/AAAA records for each nameserver
+        ns_info = {}
+        for ns in ns_list:
+            ns_info[ns] = {
+                'a_records': [],
+                'aaaa_records': []
+            }
+            try:
+                a_records = query_resolver.resolve(ns, 'A')
+                ns_info[ns]['a_records'] = [r.to_text() for r in a_records]
+            except:
+                pass
+            try:
+                aaaa_records = query_resolver.resolve(ns, 'AAAA')
+                ns_info[ns]['aaaa_records'] = [r.to_text() for r in aaaa_records]
+            except:
+                pass
+        
+        return jsonify({
+            'domain': domain,
+            'nameservers': ns_list,
+            'nameserver_info': ns_info,
+            'dns_server_used': dns_server
+        })
+    except Exception as e:
+        app.logger.error(f"Error getting nameservers for {domain}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 
 def check_glue_records(domain, custom_resolver=None):
     """
@@ -315,4 +737,29 @@ def trace_delegation(domain, verbose=False, custom_resolver=None, debug=False):
             if i > 1:  # 0=root, 1=TLD, 2+=domain levels
                 should_continue = False
         
-        # Flag slow
+        # Flag slow responses (>2000ms is considered slow for DNS)
+        is_slow = response_time > 2000
+        timing_info[zone] = {
+            'response_time': response_time, 
+            'is_slow': is_slow,
+            'error_type': error_type
+        }
+        
+        result.append({
+            'zone': zone, 
+            'nameservers': ns_list, 
+            'verbose': verbose_info if verbose else None,
+            'response_time': response_time,
+            'is_slow': is_slow,
+            'error_type': error_type,
+            'trace_stopped': not should_continue and i < len(chain) - 1
+        })
+    
+    # If we stopped early, update the chain to reflect what was actually traced
+    if not should_continue and len(result) < len(chain):
+        chain = chain[:len(result)]
+    
+    return result, chain, timing_info if debug else {}
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
