@@ -173,13 +173,12 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             remaining_points = max(0, weights['glue'] - deduction)
             score += remaining_points
             
-            breakdown.append("+" + str(round(remaining_points, 1)) + " points: Glue records (after penalties)")
             if major_glue_issues > 0:
                 issue_text = "issue" if major_glue_issues == 1 else "issues"
-                breakdown.append("  • -" + str(round(major_glue_issues * 1.0, 1)) + " points: " + str(major_glue_issues) + " major glue " + issue_text)
+                breakdown.append("-" + str(round(major_glue_issues * 1.0, 1)) + " points: " + str(major_glue_issues) + " major glue " + issue_text + " found")
             if minor_glue_issues > 0:
                 issue_text = "issue" if minor_glue_issues == 1 else "issues"
-                breakdown.append("  • -" + str(round(minor_glue_issues * 0.25, 1)) + " points: " + str(minor_glue_issues) + " minor glue " + issue_text)
+                breakdown.append("-" + str(round(minor_glue_issues * 0.25, 1)) + " points: " + str(minor_glue_issues) + " minor glue " + issue_text + " found")
     
     # Check cross-reference consistency and nameserver health
     if cross_ref_results:
@@ -211,20 +210,19 @@ def calculate_health_score(trace, glue_results=None, cross_ref_results=None):
             remaining_points = max(0, weights['crossRef'] - deduction)
             score += remaining_points
             
-            breakdown.append("+" + str(round(remaining_points, 1)) + " points: Nameserver references (after penalties)")
             if broken_nameservers > 0:
                 ns_text = "nameserver" if broken_nameservers == 1 else "nameservers"
-                breakdown.append("  • -" + str(round(broken_nameservers * 1.0, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text)
+                breakdown.append("-" + str(round(broken_nameservers * 1.0, 1)) + " points: " + str(broken_nameservers) + " broken " + ns_text + " found")
                 # Add specific broken nameserver details
                 broken_details = [detail for detail in inconsistency_details if ": " in detail]
                 for detail in broken_details[:3]:  # Show first 3 broken nameserver issues
-                    breakdown.append("    ◦ " + detail)
+                    breakdown.append("  • " + detail)
                 if len(broken_details) > 3:
-                    breakdown.append("    ◦ ... and " + str(len(broken_details) - 3) + " more")
+                    breakdown.append("  • ... and " + str(len(broken_details) - 3) + " more")
             
             if inconsistencies > 0:
                 ref_text = "reference" if inconsistencies == 1 else "references"
-                breakdown.append("  • -" + str(round(inconsistencies * 0.25, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text)
+                breakdown.append("-" + str(round(inconsistencies * 0.25, 1)) + " points: " + str(inconsistencies) + " inconsistent nameserver " + ref_text + " found")
     
     # Normalize score to be out of 10
     max_score = 10
