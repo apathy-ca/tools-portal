@@ -33,7 +33,8 @@
         <img src="{{ url_for('static', filename='dns_by_eye_200x200.png') }}" alt="DNS By Eye Logo" style="height:40px; width:40px;">
         <h1 style="margin:0;">DNS By Eye</h1>
     </header>
-    <form id="domainForm" style="display:flex; align-items:center; gap:10px; margin-bottom:1em; max-width: 800px; flex-wrap: wrap;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1em;">
+        <form id="domainForm" style="display:flex; align-items:center; gap:10px; flex-grow:1; max-width: 800px; flex-wrap: wrap;">
         <textarea id="domainInput" placeholder="Enter domain(s) - one per line for comparison (e.g. example.com)" required style="flex-grow:1; min-width: 300px; min-height: 60px; resize: vertical; font-family: monospace;"></textarea>
         <div style="display:flex; flex-direction:column; gap:2px;">
             <label for="dnsServerSelect" style="font-size:0.9em; color:#666;">DNS Server:</label>
@@ -42,7 +43,17 @@
             </select>
         </div>
         <button type="submit">Trace Delegation</button>
-    </form>
+        </form>
+        <div id="healthScore" style="display:none; align-items:center; gap:5px; padding:5px 10px; border-radius:4px; font-weight:bold;">
+            <span class="score">10/10</span>
+            <div class="indicator" style="width:20px; height:20px; border-radius:50%;"></div>
+            <button class="details" style="background:none; border:1px solid #ccc; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:0.8em;">Details</button>
+        </div>
+    </div>
+    <div id="scoreDetails" style="display:none; margin-bottom:1em; padding:10px; border:1px solid #ddd; border-radius:4px; background:#f8f9fa;">
+        <h4 style="margin:0 0 10px 0;">DNS Health Score Breakdown</h4>
+        <ul style="margin:0; padding-left:20px;" id="scoreBreakdown"></ul>
+    </div>
     <div style="display:flex; align-items:center; gap:15px; margin-bottom:1em; flex-wrap: wrap;">
         <label>
             <input type="checkbox" id="verboseCheckbox">
@@ -260,6 +271,144 @@ if __name__ == "__main__":
             } catch (err) {
                 console.error('Failed to load DNS servers:', err);
             }
+        }
+
+        // Health score calculation function
+        function calculateHealthScore(data) {
+            let score = 10;
+            let breakdown = [];
+            
+            // Check for errors in trace
+            let hasErrors = false;
+            let hasSlowResponses = false;
+            let errorCount = 0;
+            let slowCount = 0;
+            
+            data.trace.forEach(node => {
+                // Check for errors in nameservers
+                if (node.nameservers.some(ns => ns.startsWith('Error:') || 
+                    ns.startsWith('NXDOMAIN:') || 
+                    ns.startsWith('No NS records:') || 
+                    ns.startsWith('Timeout:') || 
+                    ns.startsWith('No nameservers:'))) {
+                    hasErrors = true;
+                    errorCount++;
+                }
+                
+                // Check for slow responses
+                if (node.is_slow) {
+                    hasSlowResponses = true;
+                    slowCount++;
+                }
+            });
+            
+            // Deduct points for errors (-2 per error, max -4)
+            if (errorCount > 0) {
+                const deduction = Math.min(errorCount * 2, 4);
+                score -= deduction;
+                breakdown.push(`-${deduction} points: ${errorCount} DNS error${errorCount > 1 ? 's' : ''} detected`);
+            }
+            
+            // Deduct points for slow responses (-1 per slow response, max -2)
+            if (slowCount > 0) {
+                const deduction = Math.min(slowCount, 2);
+                score -= deduction;
+                breakdown.push(`-${deduction} points: ${slowCount} slow response${slowCount > 1 ? 's' : ''}`);
+            }
+            
+            // Check glue records if available
+            if (data.glue_results) {
+                let glueIssueCount = 0;
+                let glueErrorCount = 0;
+                
+                Object.values(data.glue_results).forEach(zone => {
+                    if (zone.glue_issues) {
+                        zone.glue_issues.forEach(issue => {
+                            if (issue.includes('Missing glue') || issue.includes("don't match")) {
+                                glueErrorCount++;
+                            } else {
+                                glueIssueCount++;
+                            }
+                        });
+                    }
+                });
+                
+                // Deduct for glue record errors (-1 per error, max -2)
+                if (glueErrorCount > 0) {
+                    const deduction = Math.min(glueErrorCount, 2);
+                    score -= deduction;
+                    breakdown.push(`-${deduction} points: ${glueErrorCount} glue record error${glueErrorCount > 1 ? 's' : ''}`);
+                }
+                
+                // Deduct for glue record warnings (-0.5 per warning, max -1)
+                if (glueIssueCount > 0) {
+                    const deduction = Math.min(glueIssueCount * 0.5, 1);
+                    score -= deduction;
+                    breakdown.push(`-${deduction} points: ${glueIssueCount} glue record warning${glueIssueCount > 1 ? 's' : ''}`);
+                }
+            }
+            
+            // Check cross-reference consistency
+            if (data.cross_ref_results) {
+                let inconsistentRefs = 0;
+                Object.entries(data.cross_ref_results).forEach(([ns, info]) => {
+                    if (info.references && !info.references.includes(ns)) {
+                        inconsistentRefs++;
+                    }
+                });
+                
+                // Deduct for inconsistent references (-1 per inconsistency, max -2)
+                if (inconsistentRefs > 0) {
+                    const deduction = Math.min(inconsistentRefs, 2);
+                    score -= deduction;
+                    breakdown.push(`-${deduction} points: ${inconsistentRefs} inconsistent nameserver reference${inconsistentRefs > 1 ? 's' : ''}`);
+                }
+            }
+            
+            // Ensure score doesn't go below 0
+            score = Math.max(0, Math.round(score * 10) / 10);
+            
+            // Add perfect score message if no deductions
+            if (breakdown.length === 0) {
+                breakdown.push('Perfect score! No issues detected');
+            }
+            
+            return { score, breakdown };
+        }
+
+        // Update health score display
+        function updateHealthScore(data) {
+            const healthScore = document.getElementById('healthScore');
+            const scoreSpan = healthScore.querySelector('.score');
+            const indicator = healthScore.querySelector('.indicator');
+            const details = healthScore.querySelector('.details');
+            const scoreDetails = document.getElementById('scoreDetails');
+            const scoreBreakdown = document.getElementById('scoreBreakdown');
+            
+            const { score, breakdown } = calculateHealthScore(data);
+            
+            // Update score and color
+            scoreSpan.textContent = `${score}/10`;
+            
+            let color;
+            if (score >= 10) {
+                color = '#28a745';  // Green
+            } else if (score >= 7) {
+                color = '#ffc107';  // Yellow
+            } else {
+                color = '#dc3545';  // Red
+            }
+            
+            indicator.style.backgroundColor = color;
+            healthScore.style.display = 'flex';
+            
+            // Update breakdown
+            scoreBreakdown.innerHTML = breakdown.map(item => `<li>${item}</li>`).join('');
+            
+            // Show/hide details
+            details.onclick = () => {
+                scoreDetails.style.display = scoreDetails.style.display === 'none' ? 'block' : 'none';
+            };
         }
 
         // Current query data for export
@@ -544,6 +693,7 @@ if __name__ == "__main__":
                 window.lastTraceData = data.trace; // Store trace data for re-rendering
                 window.lastGraphData = data; // Store full data for graph re-rendering
                 document.getElementById('chain').innerHTML = data.chain ? `<b>Chain:</b> ${data.chain}` : '';
+                updateHealthScore(data);
                 const rootFirst = document.getElementById('rootFirstCheckbox').checked;
                 document.getElementById('tree').innerHTML = renderTree(data.trace, verbose, rootFirst);
                 document.getElementById('exportButtons').style.display = 'flex';
@@ -648,6 +798,8 @@ if __name__ == "__main__":
                 document.getElementById('tree').innerHTML = renderComparisonTree(data.comparison_results);
                 document.getElementById('exportButtons').style.display = 'flex';
                 document.getElementById('graphviz').innerHTML = '';
+                document.getElementById('healthScore').style.display = 'none';
+                document.getElementById('scoreDetails').style.display = 'none';
             }
         });
 
