@@ -38,5 +38,5 @@ ENV GUNICORN_CMD_ARGS="--config=gunicorn_config.py --capture-output --enable-std
 # Switch to non-root user
 USER appuser
 
-# Run the app with proper logging configuration and debug output
-CMD ["sh", "-c", "python -c 'import sys; print(sys.path); import flask; print(flask.__version__); import gunicorn; print(gunicorn.__version__)' && gunicorn --config=gunicorn_config.py --log-level debug app.main:app"]
+# Run the app with debug output and Flask development server
+CMD ["sh", "-c", "python -c 'import sys; print(sys.path); import flask; print(flask.__version__); import gunicorn; print(gunicorn.__version__)' && python -m flask run --host=0.0.0.0 --port=5000 --debug"]
