@@ -429,6 +429,111 @@ def api_trace_domain(domain):
         app.logger.error(f"Error tracing domain {domain}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/export/<domain>', methods=['GET'])
+@limiter.limit(Config.RATELIMIT_DEFAULT)
+def export_data(domain):
+    """Export endpoint for DNS delegation data in JSON or CSV format."""
+    if not is_valid_domain(domain):
+        return jsonify({'error': 'Invalid domain format'}), 400
+        
+    format = request.args.get('format', 'json').lower()
+    verbose = request.args.get('verbose', 'false').lower() == 'true'
+    dns_server = request.args.get('dns_server', 'system')
+    debug = request.args.get('debug', 'false').lower() == 'true'
+    
+    if not is_valid_dns_server(dns_server):
+        return jsonify({'error': 'Invalid DNS server'}), 400
+    
+    try:
+        custom_resolver = create_custom_resolver(dns_server)
+        trace, chain, timing = trace_delegation(domain, verbose=verbose, custom_resolver=custom_resolver, debug=debug)
+        chain_str = " → ".join(chain)
+        
+        # Get additional data
+        glue_results = check_glue_records(domain, custom_resolver)
+        last_level_ns = [ns for ns in trace[-1]['nameservers'] 
+                        if not ns.startswith(('Error:', 'NXDOMAIN:', 'No NS records:', 'Timeout:', 'No nameservers:'))]
+        cross_ref_results = test_last_level_ns_references(last_level_ns, domain) if last_level_ns else {}
+        
+        if format == 'json':
+            data = {
+                'domain': domain,
+                'chain': chain_str,
+                'dns_server_used': dns_server,
+                'trace': trace,
+                'timing_info': timing,
+                'glue_results': glue_results,
+                'cross_ref_results': cross_ref_results,
+                'health_score': calculate_health_score(trace, glue_results, cross_ref_results)
+            }
+            response = make_response(jsonify(data))
+            response.headers['Content-Type'] = 'application/json'
+            response.headers['Content-Disposition'] = f'attachment; filename={domain}_dns_analysis.json'
+            return response
+            
+        elif format == 'csv':
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Write header
+            writer.writerow(['Domain Analysis Report for ' + domain])
+            writer.writerow(['Chain:', chain_str])
+            writer.writerow(['DNS Server:', dns_server])
+            writer.writerow([])
+            
+            # Write delegation trace
+            writer.writerow(['Delegation Trace'])
+            writer.writerow(['Zone', 'Nameservers', 'Response Time (ms)', 'Is Slow', 'Error Type'])
+            for node in trace:
+                writer.writerow([
+                    node['zone'],
+                    '; '.join(node['nameservers']),
+                    node['response_time'],
+                    'Yes' if node.get('is_slow') else 'No',
+                    node.get('error_type', '')
+                ])
+            writer.writerow([])
+            
+            # Write glue records analysis
+            writer.writerow(['Glue Records Analysis'])
+            for zone, data in glue_results.items():
+                writer.writerow(['Zone:', zone])
+                writer.writerow(['Status:', data['status']])
+                if data['glue_issues']:
+                    writer.writerow(['Issues:'])
+                    for issue in data['glue_issues']:
+                        writer.writerow(['', issue])
+                writer.writerow([])
+            
+            # Write cross-reference results
+            writer.writerow(['Domain Report'])
+            for ns, info in cross_ref_results.items():
+                if isinstance(info, dict):
+                    writer.writerow(['Nameserver:', ns])
+                    writer.writerow(['References:', '; '.join(info.get('references', []))])
+                    writer.writerow([])
+            
+            # Write health score
+            health_score = calculate_health_score(trace, glue_results, cross_ref_results)
+            writer.writerow(['Health Score'])
+            writer.writerow(['Score:', f"{health_score['score']}/{health_score['max_score']}"])
+            writer.writerow(['Percentage:', f"{health_score['percentage']}%"])
+            writer.writerow([])
+            writer.writerow(['Score Breakdown'])
+            for detail in health_score['breakdown']:
+                writer.writerow(['', detail])
+            
+            response = make_response(output.getvalue())
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = f'attachment; filename={domain}_dns_analysis.csv'
+            return response
+        else:
+            return jsonify({'error': 'Invalid export format. Use "json" or "csv"'}), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error exporting data for {domain}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/nameservers/<domain>', methods=['GET'])
 @limiter.limit(Config.RATELIMIT_DEFAULT)
 def api_nameservers(domain):
