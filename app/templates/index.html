@@ -238,28 +238,6 @@ if __name__ == "__main__":
         </div>
     </footer>
     <script>
-        function renderTree(trace, verbose) {
-            if (!trace.length) return '';
-            let html = '<ul>';
-            for (let i = 0; i < trace.length; i++) {
-                const node = trace[i];
-                // Hide TLD layers (0 and 1) unless verbose is true
-                if (!verbose && (i === 0 || i === 1)) {
-                    continue;
-                }
-                html += '<li>';
-                html += `<span class="zone">${node.zone}</span>: `;
-                if (node.nameservers.length && node.nameservers[0].startsWith("Error:")) {
-                    html += `<span class="error">${node.nameservers[0]}</span>`;
-                } else {
-                    html += node.nameservers.join(', ');
-                }
-                html += '</li>';
-            }
-            html += '</ul>';
-            return html;
-        }
-
         // Load DNS servers on page load
         async function loadDnsServers() {
             try {
