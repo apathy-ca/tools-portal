@@ -302,35 +302,39 @@ if __name__ == "__main__":
             
             // Check glue records if available
             if (data.glue_results) {
-                let glueCorrect = true;
+                let glueIssues = 0;
                 Object.values(data.glue_results).forEach(zone => {
-                    if (zone.glue_issues && zone.glue_issues.length > 0) {
-                        glueCorrect = false;
+                    if (zone.glue_issues) {
+                        glueIssues += zone.glue_issues.length;
                     }
                 });
                 
-                if (glueCorrect) {
+                if (glueIssues === 0) {
                     score++;
                     breakdown.push('+1 point: All glue records are correct');
                 } else {
-                    breakdown.push('+0 points: Issues found with glue records');
+                    let deduction = Math.min(glueIssues * 0.5, 1);
+                    score -= deduction;
+                    breakdown.push(`-${deduction.toFixed(1)} points: ${glueIssues} glue record issue${glueIssues > 1 ? 's' : ''} found`);
                 }
             }
             
             // Check cross-reference consistency
             if (data.cross_ref_results) {
-                let allConsistent = true;
+                let inconsistencies = 0;
                 Object.entries(data.cross_ref_results).forEach(([ns, info]) => {
                     if (info.references && !info.references.includes(ns)) {
-                        allConsistent = false;
+                        inconsistencies++;
                     }
                 });
                 
-                if (allConsistent) {
+                if (inconsistencies === 0) {
                     score++;
                     breakdown.push('+1 point: All nameserver references are consistent');
                 } else {
-                    breakdown.push('+0 points: Inconsistent nameserver references found');
+                    let deduction = Math.min(inconsistencies * 0.5, 1);
+                    score -= deduction;
+                    breakdown.push(`-${deduction.toFixed(1)} points: ${inconsistencies} inconsistent nameserver reference${inconsistencies > 1 ? 's' : ''} found`);
                 }
             }
             
@@ -656,6 +660,8 @@ if __name__ == "__main__":
             document.getElementById('tree').innerHTML = 'Loading...';
             document.getElementById('graphviz').innerHTML = '';
             document.getElementById('exportButtons').style.display = 'none';
+            document.getElementById('healthScore').style.display = 'none';
+            document.getElementById('scoreDetails').style.display = 'none';
             
             // Update URL for bookmarking
             updateUrlParams(domains, verbose, dns_server, debug);
@@ -687,8 +693,6 @@ if __name__ == "__main__":
                 }
                 
                 currentQueryData = { domain: domains[0], verbose, dns_server, debug };
-                window.lastTraceData = data.trace; // Store trace data for re-rendering
-                window.lastGraphData = data; // Store full data for graph re-rendering
                 document.getElementById('chain').innerHTML = data.chain ? `<b>Chain:</b> ${data.chain}` : '';
                 updateHealthScore(data);
                 const rootFirst = document.getElementById('rootFirstCheckbox').checked;
