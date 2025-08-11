@@ -370,11 +370,24 @@ def api_delegation():
                         dot.node(ns, ns)
                         # Add edge from domain to nameserver
                         dot.edge(domain, ns)
-                        # Add edges for references, including self-references
-                        for ref in cross_ref_results[ns].get('references', []):
-                            dot.edge(ns, ref, color='blue')
-                        if ns in cross_ref_results[ns].get('references', []):
-                            dot.edge(ns, ns, color='green', label='self-ref')
+                
+                # Add edges for references in a second pass to ensure all nodes exist
+                for ns in cross_ref_results:
+                    if isinstance(cross_ref_results[ns], dict):
+                        refs = cross_ref_results[ns].get('references', [])
+                        # Add self-reference if present
+                        if ns in refs:
+                            dot.edge(ns, ns, color='green', label='self-ref', dir='both')
+                        # Add references to other nameservers
+                        for ref in refs:
+                            if ref != ns:  # Skip self-references as they're handled above
+                                # Check if there's a mutual reference
+                                if isinstance(cross_ref_results[ref], dict) and ns in cross_ref_results[ref].get('references', []):
+                                    # Only add one edge for mutual references
+                                    if ns < ref:  # Use alphabetical order to ensure consistent edge creation
+                                        dot.edge(ns, ref, color='blue', dir='both', label='mutual')
+                                else:
+                                    dot.edge(ns, ref, color='blue')
                 
                 # Save graph
                 filename = f"{domain.replace('.', '_')}_domain_report"
