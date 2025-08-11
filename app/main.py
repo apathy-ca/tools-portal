@@ -393,7 +393,7 @@ def api_delegation():
             'cross_ref_results': cross_ref_results,
             'health_score': calculate_health_score(trace, glue_results, cross_ref_results),
             'graph_urls': graph_urls,
-            'cross_ref_graph_url': cross_ref_graph_url
+            'domain_report_graph_url': domain_report_graph_url
         })
     except Exception as e:
         app.logger.error(f"Error processing delegation request for {domain}: {str(e)}")
