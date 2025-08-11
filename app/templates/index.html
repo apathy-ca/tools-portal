@@ -273,89 +273,23 @@ if __name__ == "__main__":
             }
         }
 
-        // Health score calculation function
-        function calculateHealthScore(data) {
-            let score = 0;
-            let breakdown = [];
-            const maxScore = 10;
+        // Use health score from API response instead of calculating separately
+        function getHealthScoreFromResponse(data) {
+            // Use the health_score from the API response directly
+            if (data.health_score) {
+                return {
+                    score: data.health_score.score,
+                    maxScore: data.health_score.max_score,
+                    breakdown: data.health_score.breakdown
+                };
+            }
             
-            // Weights for different layers
-            const weights = {
-                root: 1,
-                tld: 1,
-                domain: 3,
-                glue: 3,
-                crossRef: 2
+            // Fallback if no health_score in response
+            return {
+                score: 0,
+                maxScore: 10,
+                breakdown: ['No health score data available']
             };
-            
-            // Check each layer and add points
-            data.trace.forEach((node, index) => {
-                let layerWeight = index === 0 ? weights.root : (index === 1 ? weights.tld : weights.domain);
-                let layerScore = 0;
-                
-                if (!node.nameservers.some(ns => ns.startsWith('Error:') || 
-                    ns.startsWith('NXDOMAIN:') || 
-                    ns.startsWith('No NS records:') || 
-                    ns.startsWith('Timeout:') || 
-                    ns.startsWith('No nameservers:'))) {
-                    layerScore += 0.7 * layerWeight;
-                    breakdown.push(`+${(0.7 * layerWeight).toFixed(1)} points: Layer ${index + 1} (${node.zone}) is healthy`);
-                } else {
-                    breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has errors`);
-                }
-                
-                if (!node.is_slow) {
-                    layerScore += 0.3 * layerWeight;
-                    breakdown.push(`+${(0.3 * layerWeight).toFixed(1)} points: Layer ${index + 1} (${node.zone}) has good response time`);
-                } else {
-                    breakdown.push(`+0 points: Layer ${index + 1} (${node.zone}) has slow response`);
-                }
-                
-                score += layerScore;
-            });
-            
-            // Check glue records if available
-            if (data.glue_results) {
-                let glueIssues = 0;
-                Object.values(data.glue_results).forEach(zone => {
-                    if (zone.glue_issues) {
-                        glueIssues += zone.glue_issues.length;
-                    }
-                });
-                
-                if (glueIssues === 0) {
-                    score += weights.glue;
-                    breakdown.push(`+${weights.glue} points: All glue records are correct`);
-                } else {
-                    let deduction = Math.min(glueIssues * 0.5, weights.glue);
-                    score += (weights.glue - deduction);
-                    breakdown.push(`+${(weights.glue - deduction).toFixed(1)} points: ${glueIssues} glue record issue${glueIssues > 1 ? 's' : ''} found`);
-                }
-            }
-            
-            // Check cross-reference consistency
-            if (data.cross_ref_results) {
-                let inconsistencies = 0;
-                Object.entries(data.cross_ref_results).forEach(([ns, info]) => {
-                    if (info.references && !info.references.includes(ns)) {
-                        inconsistencies++;
-                    }
-                });
-                
-                if (inconsistencies === 0) {
-                    score += weights.crossRef;
-                    breakdown.push(`+${weights.crossRef} points: All nameserver references are consistent`);
-                } else {
-                    let deduction = Math.min(inconsistencies * 0.5, weights.crossRef);
-                    score += (weights.crossRef - deduction);
-                    breakdown.push(`+${(weights.crossRef - deduction).toFixed(1)} points: ${inconsistencies} inconsistent nameserver reference${inconsistencies > 1 ? 's' : ''} found`);
-                }
-            }
-            
-            // Normalize score to be out of 10
-            score = Math.min(10, Math.round(score * 10) / 10);
-            
-            return { score, maxScore, breakdown };
         }
 
         // Update health score display
@@ -367,7 +301,7 @@ if __name__ == "__main__":
             const scoreDetails = document.getElementById('scoreDetails');
             const scoreBreakdown = document.getElementById('scoreBreakdown');
             
-            const { score, maxScore, breakdown } = calculateHealthScore(data);
+                const { score, maxScore, breakdown } = getHealthScoreFromResponse(data);
             
             // Update score and color
             scoreSpan.textContent = `${score}/${maxScore}`;
