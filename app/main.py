@@ -829,6 +829,9 @@ def test_last_level_ns_references(nameservers, domain):
                                 # Always add the reference, even if it's not in our nameserver list
                                 # This helps catch cases where a nameserver references itself or others
                                 results[ns]['references'].add(ref_ns)
+                                # If this is a self-reference, mark it explicitly
+                                if ref_ns.rstrip('.') == ns.rstrip('.'):
+                                    results[ns]['self_reference'] = True
         except Exception as e:
             app.logger.warning(f"Error querying nameserver {ns} for {domain}: {e}")
             results[ns] = {'references': set(), 'error': str(e)}
