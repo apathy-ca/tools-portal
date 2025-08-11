@@ -545,6 +545,81 @@ def api_trace_domain(domain):
         app.logger.error("Error tracing domain " + domain + ": " + str(e))
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/compare', methods=['POST'])
+@limiter.limit(Config.RATELIMIT_API_DEFAULT)
+def api_compare():
+    """API endpoint for comparing multiple domains."""
+    try:
+        # Validate request body
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Missing request body'}), 400
+            
+        # Input validation
+        domains = data.get('domains', [])
+        if not domains or not isinstance(domains, list):
+            return jsonify({'error': 'Domains list is required'}), 400
+        if len(domains) > 10:  # Limit to 10 domains for performance
+            return jsonify({'error': 'Maximum 10 domains allowed for comparison'}), 400
+            
+        dns_server = data.get('dns_server', 'system')
+        if not is_valid_dns_server(dns_server):
+            return jsonify({'error': 'Invalid DNS server'}), 400
+            
+        verbose = bool(data.get('verbose', False))
+        debug = bool(data.get('debug', False))
+        
+        # Validate all domains
+        for domain in domains:
+            if not is_valid_domain(domain):
+                return jsonify({'error': f'Invalid domain format: {domain}'}), 400
+        
+        app.logger.info(f"Received comparison request for domains: {', '.join(domains)}")
+        
+        # Create custom resolver if specified
+        custom_resolver = create_custom_resolver(dns_server)
+        
+        # Analyze each domain
+        comparison_results = {}
+        for domain in domains:
+            try:
+                trace, chain, timing = trace_delegation(domain, verbose=verbose, custom_resolver=custom_resolver, debug=debug)
+                
+                # Calculate summary statistics
+                total_response_time = sum(node.get('response_time', 0) for node in trace)
+                slow_responses = sum(1 for node in trace if node.get('is_slow', False))
+                nameserver_count = sum(len(node['nameservers']) for node in trace)
+                
+                comparison_results[domain] = {
+                    'domain': domain,
+                    'trace': trace,
+                    'chain': " → ".join(chain),
+                    'total_response_time': round(total_response_time, 2),
+                    'slow_responses': slow_responses,
+                    'nameserver_count': nameserver_count,
+                    'status': 'success'
+                }
+                
+            except Exception as e:
+                app.logger.error(f"Error analyzing domain {domain}: {str(e)}")
+                comparison_results[domain] = {
+                    'domain': domain,
+                    'status': 'error',
+                    'error': str(e)
+                }
+        
+        return jsonify({
+            'comparison_results': comparison_results,
+            'dns_server_used': dns_server,
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+            'total_domains': len(domains),
+            'successful_domains': len([r for r in comparison_results.values() if r.get('status') == 'success'])
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error processing comparison request: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/export/<domain>', methods=['GET'])
 @limiter.limit(Config.RATELIMIT_DEFAULT)
 def export_data(domain):
