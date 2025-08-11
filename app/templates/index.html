@@ -56,6 +56,10 @@
             <input type="checkbox" id="glueCheckbox" checked>
             Check glue records
         </label>
+        <label>
+            <input type="checkbox" id="rootFirstCheckbox">
+            Display from root servers down
+        </label>
         <button type="button" id="shareUrlBtn" style="background:none; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.9em;">
             🔗 Share URL
         </button>
@@ -283,15 +287,27 @@ if __name__ == "__main__":
         // Current query data for export
         let currentQueryData = null;
 
-        function renderTree(trace, verbose) {
+        function renderTree(trace, verbose, rootFirst = false) {
             if (!trace.length) return '';
             let html = '<ul>';
+            
+            // Create array of indices to iterate over
+            let indices = [];
             for (let i = 0; i < trace.length; i++) {
-                const node = trace[i];
                 // Hide TLD layers (0 and 1) unless verbose is true
                 if (!verbose && (i === 0 || i === 1)) {
                     continue;
                 }
+                indices.push(i);
+            }
+            
+            // Reverse the order unless rootFirst is true
+            if (!rootFirst) {
+                indices.reverse();
+            }
+            
+            for (const i of indices) {
+                const node = trace[i];
                 html += '<li>';
                 html += `<span class="zone">${node.zone}</span>: `;
                 if (node.nameservers.length && node.nameservers[0].startsWith("Error:")) {
@@ -527,8 +543,10 @@ if __name__ == "__main__":
                 }
                 
                 currentQueryData = { domain: domains[0], verbose, dns_server, debug };
+                window.lastTraceData = data.trace; // Store trace data for re-rendering
                 document.getElementById('chain').innerHTML = data.chain ? `<b>Chain:</b> ${data.chain}` : '';
-                document.getElementById('tree').innerHTML = renderTree(data.trace, verbose);
+                const rootFirst = document.getElementById('rootFirstCheckbox').checked;
+                document.getElementById('tree').innerHTML = renderTree(data.trace, verbose, rootFirst);
                 document.getElementById('exportButtons').style.display = 'flex';
                 
                 if (data.graph_urls && data.graph_urls.length) {
@@ -627,6 +645,15 @@ if __name__ == "__main__":
             verboseSections.forEach(section => {
                 section.style.display = isChecked ? 'block' : 'none';
             });
+        });
+
+        // Add event listener to re-render tree when root-first checkbox changes
+        document.getElementById('rootFirstCheckbox').addEventListener('change', function() {
+            if (currentQueryData && currentQueryData.domain && window.lastTraceData) {
+                const verbose = document.getElementById('verboseCheckbox').checked;
+                const rootFirst = this.checked;
+                document.getElementById('tree').innerHTML = renderTree(window.lastTraceData, verbose, rootFirst);
+            }
         });
 
         // Toggle documentation visibility
