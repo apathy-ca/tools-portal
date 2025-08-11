@@ -323,7 +323,8 @@ if __name__ == "__main__":
             const items = breakdown.map(item => {
                 let icon, color;
                 if (item.includes('has errors') || item.includes('has slow response') || 
-                    item.includes('issue') || item.includes('inconsistent')) {
+                    item.includes('issue') || item.includes('inconsistent') || 
+                    item.startsWith('-')) {
                     icon = '❌';
                     color = '#dc3545';
                 } else {
