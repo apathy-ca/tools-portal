@@ -1,25 +1,36 @@
-# DNS By Eye
+# Tools Portal
 
-**Version 1.0.2**
+**A collection of useful network and system administration tools**
 
-DNS By Eye is a Flask-based DNS delegation visualizer. It traces DNS delegation chains from the root through TLDs to the authoritative nameservers, then renders interactive graphs of each layer and cross-reference diagrams. Features include:
+Tools Portal is a modern web-based platform hosting multiple specialized tools for network analysis, system administration, and development tasks. Built with a microservices architecture, each tool runs independently while sharing common infrastructure.
+
+## 🛠️ Available Tools
+
+### DNS By Eye (v1.0.2)
+**DNS delegation visualizer with health scoring and glue record analysis**
 
 - **Layered health scoring**: Domain-focused health assessment with 1 point per delegation layer plus bonuses
 - **Smart graph condensation**: Large nameserver sets (4+) show first 3 + "X more" for cleaner visuals
 - **Resilient DNS tracing**: Gracefully handles broken nameservers and non-existent domains
 - **Intelligent glue analysis**: Ignores "unnecessary" glue records while flagging serious issues
 - **Multi-domain comparison**: Compare DNS delegation paths across multiple domains
-- **Response time monitoring**: Track DNS query performance with slow response indicators
 - **Interactive visualizations**: Graphviz-based PNG diagrams for each delegation layer
-- **Cross-reference analysis**: Detailed analysis of nameserver relationships and consistency
-- **Error visualization**: Visual indicators for broken nameservers and DNS failures
 - **Comprehensive API**: RESTful endpoints for programmatic access
 - **Export capabilities**: JSON and CSV export formats
-- **URL sharing**: Shareable URLs with query parameters for easy collaboration
-- **Multiple DNS servers**: Support for various public DNS resolvers
-- **Debug mode**: Detailed timing and performance analysis
-- **Rate limiting**: Built-in protection against abuse
-- **Modern UI**: Clean, responsive interface with syntax highlighting
+
+**Access**: `/dns-by-eye/` | **Category**: DNS & Networking | **Status**: Stable
+
+### Future Tools
+More tools will be added to expand the platform's capabilities in security analysis, system monitoring, and development utilities.
+
+## 🏗️ Architecture
+
+The Tools Portal uses a microservices architecture with:
+
+- **Main Portal**: Landing page and tool discovery (`/`)
+- **Individual Tools**: Each tool runs as a separate service (`/tool-name/`)
+- **Nginx Reverse Proxy**: Routes requests to appropriate services
+- **Shared Infrastructure**: Redis caching, monitoring, and cleanup services
 
 ## Features
 

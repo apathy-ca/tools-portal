@@ -1,42 +1,46 @@
-# DNS By Eye - DNS Delegation Visualizer v1.0.0
-# Use a lightweight Python image
-FROM python:3.11-slim
+# Multi-stage build for Tools Portal
+FROM python:3.11-slim as base
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies for graphviz
-RUN apt-get update && apt-get install -y graphviz && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt config.py gunicorn_config.py ./
+# Copy portal requirements and install
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
-COPY app ./app
+# Copy portal application
+COPY app.py .
+COPY templates/ templates/
+COPY static/ static/
 
-# Create necessary directories and set permissions
-RUN mkdir -p /var/log/gunicorn && \
-    mkdir -p /app/logs && \
-    useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app /var/log/gunicorn && \
-    chmod -R 755 /app/app/static && \
-    mkdir -p /app/app/static/generated && \
-    chown -R appuser:appuser /app/app/static/generated && \
-    chmod -R 775 /app/app/static/generated
+# Build DNS By Eye tool
+FROM base as dns-by-eye-builder
+WORKDIR /app/tools/dns-by-eye
+COPY tools/dns-by-eye/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose Flask port
+# Final stage
+FROM base as final
+WORKDIR /app
+
+# Copy DNS By Eye tool
+COPY --from=dns-by-eye-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY tools/ tools/
+
+# Create directories for generated files
+RUN mkdir -p tools/dns-by-eye/app/static/generated
+
+# Expose port
 EXPOSE 5000
 
-# Set environment variables
-ENV FLASK_APP=app/main.py
-ENV FLASK_RUN_HOST=0.0.0.0
-ENV FLASK_RUN_PORT=5000
-ENV PYTHONUNBUFFERED=1
-ENV GUNICORN_CMD_ARGS="--config=gunicorn_config.py --capture-output --enable-stdio-inheritance"
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
 
-# Switch to non-root user
-USER appuser
-
-# Run the app with debug output and Flask development server
-CMD ["sh", "-c", "python -c 'import sys; print(sys.path); import flask; print(flask.__version__); import gunicorn; print(gunicorn.__version__)' && python -m flask run --host=0.0.0.0 --port=5000 --debug"]
+# Run the application
+CMD ["python", "app.py"]

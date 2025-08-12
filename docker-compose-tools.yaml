@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Main tools portal
+  tools-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    container_name: tools-portal
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./static:/app/static
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # DNS By Eye tool
+  dns-by-eye:
+    build:
+      context: ./tools/dns-by-eye
+      dockerfile: Dockerfile
+    container_name: dns-by-eye
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./tools/dns-by-eye/app/static/generated:/app/app/static/generated
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: tools-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-tools.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - tools-portal
+      - dns-by-eye
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching (shared across tools)
+  redis:
+    image: redis:7-alpine
+    container_name: tools-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cleanup service for generated files
+  cleanup:
+    image: alpine:latest
+    container_name: tools-cleanup
+    restart: unless-stopped
+    volumes:
+      - ./tools/dns-by-eye/app/static/generated:/cleanup/dns-by-eye
+    command: >
+      sh -c "
+        while true; do
+          echo 'Cleaning up generated files older than 1 day...'
+          find /cleanup -name '*.png' -type f -mtime +1 -delete 2>/dev/null || true
+          find /cleanup -name '*.svg' -type f -mtime +1 -delete 2>/dev/null || true
+          echo 'Cleanup completed. Sleeping for 24 hours...'
+          sleep 86400
+        done
+      "
+    networks:
+      - tools-network
+
+volumes:
+  redis_data:
+
+networks:
+  tools-network:
+    driver: bridge
