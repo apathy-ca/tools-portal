@@ -6,26 +6,27 @@ DNS By Eye is currently showing an informational page instead of the actual tool
 
 ## 🚀 Fix DNS By Eye Now
 
-Run these commands on your server to make DNS By Eye functional:
+Run these commands on your server to make DNS By Eye functional with SSL:
 
 ```bash
-# Pull latest code (includes nginx and app.py fixes)
+# Pull latest code (includes SSL microservices deployment)
 sudo git pull origin main
 
 # Stop current deployment
 sudo docker compose -f docker-compose-tools.yaml down 2>/dev/null || sudo docker compose -f docker-compose.ssl.yaml down
 
-# Deploy microservices architecture with functional DNS By Eye
-sudo docker compose -f docker-compose-tools.yaml up -d --build
+# Deploy SSL-enabled microservices architecture with functional DNS By Eye
+sudo docker compose -f docker-compose-tools-ssl.yaml up -d --build
 
 # Check status (all containers should be running)
 sudo docker ps
 ```
 
-**Note**: The latest update includes fixes for:
-- Nginx configuration errors (`limit_req_zone` directive placement)
-- Tools-portal container restart issues
-- Service connectivity problems
+**Note**: The latest update includes:
+- ✅ **SSL Support**: Full HTTPS with Let's Encrypt certificates
+- ✅ **Microservices Architecture**: Separate DNS By Eye and Tools Portal services
+- ✅ **Nginx Configuration**: Fixed rate limiting and service routing
+- ✅ **Production Ready**: All security headers and optimizations
 
 ## ✅ What This Provides
 
