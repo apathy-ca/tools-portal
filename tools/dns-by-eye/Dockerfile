@@ -16,10 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 # Create necessary directories and set permissions
-RUN mkdir -p /var/log/gunicorn && \
-    mkdir -p /app/logs && \
+RUN mkdir -p /app/logs && \
     useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app /var/log/gunicorn && \
+    chown -R appuser:appuser /app && \
     chmod -R 755 /app/app/static && \
     mkdir -p /app/app/static/generated && \
     chown -R appuser:appuser /app/app/static/generated && \
