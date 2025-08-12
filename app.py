@@ -92,21 +92,32 @@ def dns_by_eye_tool(path=''):
         # Import the DNS By Eye app
         from app.main import app as dns_app
         
-        # Handle the request using DNS By Eye app
-        with dns_app.test_request_context(f'/{path}', method=request.method, 
-                                        query_string=request.query_string,
-                                        data=request.get_data(),
-                                        headers=request.headers):
-            try:
-                response = dns_app.full_dispatch_request()
-                return response.get_data(as_text=True), response.status_code, dict(response.headers)
-            except Exception as e:
-                # If DNS By Eye app fails, show a helpful error
-                return render_template('500.html'), 500
+        # Create a test client and make the request
+        with dns_app.test_client() as client:
+            # Forward the request to DNS By Eye
+            if request.method == 'GET':
+                response = client.get(f'/{path}', query_string=request.query_string)
+            elif request.method == 'POST':
+                response = client.post(f'/{path}', 
+                                     data=request.get_data(),
+                                     content_type=request.content_type,
+                                     query_string=request.query_string)
+            else:
+                response = client.open(f'/{path}', 
+                                     method=request.method,
+                                     data=request.get_data(),
+                                     content_type=request.content_type,
+                                     query_string=request.query_string)
+            
+            # Return the response from DNS By Eye
+            return response.get_data(as_text=True), response.status_code, dict(response.headers)
                 
     except ImportError as e:
         # DNS By Eye not available, show error message
         return f"DNS By Eye tool is not available. Error: {str(e)}", 503
+    except Exception as e:
+        # Other errors
+        return f"Error loading DNS By Eye: {str(e)}", 500
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
