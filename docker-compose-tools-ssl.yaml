@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: base
+      target: final
     container_name: tools-portal
     restart: unless-stopped
     environment:
@@ -73,6 +73,15 @@ services:
       - certbot_www:/var/www/certbot
     networks:
       - tools-network
+    command: >
+      sh -c "
+        while true; do
+          echo 'Certbot renewal check...'
+          certbot renew --quiet --no-self-upgrade
+          echo 'Next renewal check in 12 hours...'
+          sleep 43200
+        done
+      "
 
   # Redis for caching (shared across tools)
   redis:
