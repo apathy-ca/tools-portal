@@ -440,7 +440,7 @@ def api_delegation():
                 
                 # Save graph
                 filename = domain.replace('.', '_') + '_' + str(i)
-                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                dot.render("static/generated/" + filename, format='png', cleanup=True)
                 graph_urls.append(url_for('static', filename='generated/' + filename + '.png'))
         except Exception as e:
             app.logger.error("Error generating graphs: " + str(e))
@@ -501,7 +501,7 @@ def api_delegation():
                 
                 # Save graph
                 filename = domain.replace('.', '_') + "_domain_report"
-                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                dot.render("static/generated/" + filename, format='png', cleanup=True)
                 domain_report_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
                 app.logger.error("Error generating Domain Report graph: " + str(e))
@@ -532,7 +532,7 @@ def api_delegation():
                 
                 # Save graph
                 filename = domain.replace('.', '_') + "_glue_analysis"
-                dot.render("app/static/generated/" + filename, format='png', cleanup=True)
+                dot.render("static/generated/" + filename, format='png', cleanup=True)
                 glue_analysis_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
                 app.logger.error("Error generating Glue Analysis graph: " + str(e))
