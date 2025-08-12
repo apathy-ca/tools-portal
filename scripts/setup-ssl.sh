@@ -136,7 +136,8 @@ fi
 
 # Try to generate SSL certificate
 CERT_RESULT=0
-docker compose -f docker-compose-tools-ssl.yaml run --rm -p 80:80 certbot certonly \
+docker compose -f docker-compose-tools-ssl.yaml run --rm -p 80:80 certbot \
+    certonly \
     --standalone \
     $EMAIL_ARG \
     --agree-tos \
