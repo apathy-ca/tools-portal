@@ -6,7 +6,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: base
     container_name: tools-portal
     restart: unless-stopped
     environment:
