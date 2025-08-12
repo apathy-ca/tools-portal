@@ -49,26 +49,44 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
 
 ### Installation
 
-1. **Clone the repository**:
+1. **Clone the repository with submodules**:
+   ```bash
+   git clone --recursive https://github.com/apathy-ca/tools-portal.git
+   cd tools-portal
+   ```
+   
+   Or if you already cloned without submodules:
    ```bash
    git clone https://github.com/apathy-ca/tools-portal.git
    cd tools-portal
+   git submodule update --init --recursive
    ```
 
-2. **Configure environment**:
+2. **Configure your domain**:
    ```bash
-   # Update docker-compose-tools-ssl.yaml with your domain
-   # Update nginx-tools-ssl.conf with your domain
+   # Update nginx-tools-ssl.conf with your domain name
+   sed -i 's/tools.apathy.ca/your-domain.com/g' nginx-tools-ssl.conf
    ```
 
-3. **Deploy with SSL**:
+3. **Deploy with SSL (Production)**:
    ```bash
+   # Set up SSL certificates first
+   ./scripts/setup-ssl.sh your-domain.com admin@your-domain.com
+   
+   # Deploy all services
    sudo docker compose -f docker-compose-tools-ssl.yaml up -d
    ```
 
-4. **Access the portal**:
-   - Main portal: `https://yourdomain.com/`
-   - DNS By Eye: `https://yourdomain.com/dns-by-eye/`
+4. **Deploy without SSL (Development)**:
+   ```bash
+   # For local development/testing
+   sudo docker compose -f docker-compose-tools.yaml up -d
+   ```
+
+5. **Access the portal**:
+   - **Production**: `https://your-domain.com/`
+   - **Development**: `http://localhost/`
+   - **DNS By Eye**: `https://your-domain.com/dns-by-eye/` or `http://localhost/dns-by-eye/`
 
 ## Configuration Files
 
@@ -140,11 +158,91 @@ sudo docker compose -f docker-compose-tools.yaml up -d
 # Access at http://localhost/
 ```
 
-### Adding Tools
-1. Create tool in `tools/` directory
-2. Add Docker service configuration
-3. Update nginx routing
-4. Update landing page
+### Git Submodule Management
+
+This project uses git submodules to integrate tools while maintaining their independent repositories.
+
+#### Working with Submodules
+```bash
+# Initialize submodules after cloning
+git submodule update --init --recursive
+
+# Update all submodules to latest
+git submodule update --remote
+
+# Update specific submodule
+git submodule update --remote tools/dns-by-eye
+
+# Check submodule status
+git submodule status
+```
+
+#### Updating Tools
+```bash
+# Update DNS By Eye to latest version
+cd tools/dns-by-eye
+git pull origin main
+cd ../..
+git add tools/dns-by-eye
+git commit -m "Update DNS By Eye submodule to latest version"
+git push origin main
+```
+
+### Adding New Tools
+
+To add a new tool as a submodule:
+
+1. **Add the tool as a submodule**:
+   ```bash
+   git submodule add https://github.com/your-org/your-tool.git tools/your-tool
+   ```
+
+2. **Update docker-compose configuration**:
+   ```yaml
+   your-tool:
+     build:
+       context: ./tools/your-tool
+       dockerfile: Dockerfile
+     container_name: your-tool
+     restart: unless-stopped
+     networks:
+       - tools-network
+     depends_on:
+       - redis
+   ```
+
+3. **Update nginx routing** in `nginx-tools-ssl.conf`:
+   ```nginx
+   # Your Tool
+   location /your-tool/ {
+       limit_req zone=general burst=20 nodelay;
+       rewrite ^/your-tool/(.*)$ /$1 break;
+       proxy_pass http://your_tool;
+       # ... proxy headers
+   }
+   ```
+
+4. **Update tool registry** in `app.py`:
+   ```python
+   TOOLS = {
+       'your-tool': {
+           'name': 'Your Tool',
+           'description': 'Description of your tool',
+           'version': '1.0.0',
+           'url': '/your-tool/',
+           'icon': '🔧',
+           'category': 'System Administration',
+           'status': 'stable'
+       }
+   }
+   ```
+
+5. **Commit the integration**:
+   ```bash
+   git add .
+   git commit -m "Add Your Tool as submodule"
+   git push origin main
+   ```
 
 ## Production Deployment
 
