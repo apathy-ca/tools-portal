@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tools Portal - Network & System Administration Tools</title>
+    <title>Tools Portal - Network Administration Tools</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <style>
         * {
@@ -43,108 +43,64 @@
             opacity: 0.9;
         }
         
-        .stats {
+        .tools-list {
             display: flex;
-            justify-content: center;
-            gap: 2rem;
-            margin: 2rem 0;
-            flex-wrap: wrap;
-        }
-        
-        .stat {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            display: block;
-        }
-        
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
-        
-        .categories {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            flex-direction: column;
             gap: 2rem;
             margin-bottom: 3rem;
         }
         
-        .category {
+        .tool {
             background: white;
             border-radius: 15px;
             padding: 2rem;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
         }
         
-        .category:hover {
+        .tool:hover {
             transform: translateY(-5px);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
         }
         
-        .category-header {
+        .tool-logo {
+            flex-shrink: 0;
+            width: 80px;
+            height: 80px;
+            border-radius: 10px;
+            overflow: hidden;
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .category-icon {
-            font-size: 2rem;
-        }
-        
-        .category-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #2d3748;
-        }
-        
-        .category-description {
-            color: #718096;
-            margin-bottom: 1.5rem;
-        }
-        
-        .tools-grid {
-            display: grid;
-            gap: 1rem;
-        }
-        
-        .tool {
+            justify-content: center;
             background: #f7fafc;
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 2px solid transparent;
-            transition: all 0.3s ease;
-            cursor: pointer;
         }
         
-        .tool:hover {
-            border-color: #667eea;
-            background: #edf2f7;
+        .tool-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .tool-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
         
         .tool-header {
             display: flex;
             align-items: center;
             gap: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .tool-icon {
-            font-size: 1.5rem;
+            flex-wrap: wrap;
         }
         
         .tool-name {
-            font-size: 1.2rem;
+            font-size: 1.8rem;
             font-weight: 600;
             color: #2d3748;
         }
@@ -152,53 +108,79 @@
         .tool-version {
             background: #667eea;
             color: white;
-            padding: 0.2rem 0.5rem;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            margin-left: auto;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .tool-status {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
         }
         
         .tool-description {
             color: #4a5568;
-            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            margin: 0.5rem 0;
         }
         
         .tool-features {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
-            margin-bottom: 1rem;
+            margin: 1rem 0;
         }
         
         .feature-tag {
             background: #e2e8f0;
             color: #4a5568;
-            padding: 0.2rem 0.5rem;
-            border-radius: 5px;
-            font-size: 0.8rem;
-        }
-        
-        .tool-status {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 5px;
-            font-size: 0.8rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.9rem;
             font-weight: 500;
         }
         
-        .status-stable {
-            background: #c6f6d5;
-            color: #22543d;
+        .tool-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
         }
         
-        .status-beta {
-            background: #fed7d7;
-            color: #742a2a;
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
         }
         
-        .status-alpha {
-            background: #feebc8;
-            color: #7b341e;
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
         }
         
         .footer {
@@ -221,28 +203,6 @@
             text-decoration: underline;
         }
         
-        .search-box {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 2rem 0;
-            backdrop-filter: blur(10px);
-        }
-        
-        .search-input {
-            width: 100%;
-            background: transparent;
-            border: none;
-            color: white;
-            font-size: 1.1rem;
-            outline: none;
-        }
-        
-        .search-input::placeholder {
-            color: rgba(255, 255, 255, 0.7);
-        }
-        
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -252,12 +212,23 @@
                 font-size: 2rem;
             }
             
-            .stats {
+            .tool {
+                flex-direction: column;
+                text-align: center;
                 gap: 1rem;
             }
             
-            .categories {
-                grid-template-columns: 1fr;
+            .tool-logo {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .tool-name {
+                font-size: 1.5rem;
+            }
+            
+            .tool-actions {
+                justify-content: center;
             }
         }
     </style>
@@ -266,70 +237,48 @@
     <div class="container">
         <header class="header">
             <h1>🛠️ Tools Portal</h1>
-            <p>A collection of useful network and system administration tools</p>
-            
-            <div class="stats">
-                <div class="stat">
-                    <span class="stat-number">{{ tools|length }}</span>
-                    <span class="stat-label">Available Tools</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number">{{ categories|length }}</span>
-                    <span class="stat-label">Categories</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number">100%</span>
-                    <span class="stat-label">Open Source</span>
-                </div>
-            </div>
-            
-            <div class="search-box">
-                <input type="text" class="search-input" placeholder="🔍 Search tools..." id="searchInput">
-            </div>
+            <p>Professional network administration tools</p>
         </header>
         
-        <main class="categories" id="categoriesContainer">
-            {% for category_name, category_info in categories.items() %}
-            <div class="category" data-category="{{ category_name }}">
-                <div class="category-header">
-                    <span class="category-icon">{{ category_info.icon }}</span>
-                    <h2 class="category-title">{{ category_name }}</h2>
+        <main class="tools-list">
+            <div class="tool" onclick="window.open('/dns-by-eye/', '_blank')">
+                <div class="tool-logo">
+                    <img src="/dns-by-eye/static/dns_by_eye_200x200.png" alt="DNS By Eye Logo">
                 </div>
-                <p class="category-description">{{ category_info.description }}</p>
-                
-                <div class="tools-grid">
-                    {% for tool_id, tool in tools.items() %}
-                    {% if tool.category == category_name %}
-                    <div class="tool" onclick="window.open('{{ tool.url }}', '_blank')" data-tool="{{ tool_id }}">
-                        <div class="tool-header">
-                            <span class="tool-icon">{{ tool.icon }}</span>
-                            <span class="tool-name">{{ tool.name }}</span>
-                            <span class="tool-version">v{{ tool.version }}</span>
-                        </div>
-                        <p class="tool-description">{{ tool.description }}</p>
-                        <div class="tool-features">
-                            {% for feature in tool.features[:3] %}
-                            <span class="feature-tag">{{ feature }}</span>
-                            {% endfor %}
-                            {% if tool.features|length > 3 %}
-                            <span class="feature-tag">+{{ tool.features|length - 3 }} more</span>
-                            {% endif %}
-                        </div>
-                        <span class="tool-status status-{{ tool.status }}">{{ tool.status.title() }}</span>
+                <div class="tool-content">
+                    <div class="tool-header">
+                        <h2 class="tool-name">DNS By Eye</h2>
+                        <span class="tool-version">v1.0.2</span>
+                        <span class="tool-status">Stable</span>
                     </div>
-                    {% endif %}
-                    {% endfor %}
+                    <p class="tool-description">
+                        Comprehensive DNS delegation analysis tool with visual graphs, health scoring, and glue record validation. 
+                        Trace DNS delegation chains from root servers to authoritative nameservers with detailed reporting.
+                    </p>
+                    <div class="tool-features">
+                        <span class="feature-tag">DNS Delegation Tracing</span>
+                        <span class="feature-tag">Visual Graphs</span>
+                        <span class="feature-tag">Health Scoring</span>
+                        <span class="feature-tag">Glue Record Analysis</span>
+                        <span class="feature-tag">Cross-Reference Validation</span>
+                        <span class="feature-tag">Export (JSON/CSV)</span>
+                        <span class="feature-tag">REST API</span>
+                        <span class="feature-tag">Multiple DNS Servers</span>
+                    </div>
+                    <div class="tool-actions">
+                        <a href="/dns-by-eye/" class="btn btn-primary" onclick="event.stopPropagation();">Launch Tool</a>
+                        <a href="https://github.com/apathy-ca/dns_by_eye" target="_blank" class="btn btn-secondary" onclick="event.stopPropagation();">View Source</a>
+                    </div>
                 </div>
             </div>
-            {% endfor %}
         </main>
         
         <footer class="footer">
             <p>
-                <strong>Tools Portal</strong> - Open source collection of network and system administration tools<br>
+                <strong>Tools Portal</strong> - Professional network administration tools<br>
                 Built with ❤️ using Flask | 
-                <a href="https://github.com/apathy-ca/tools-portal" target="_blank">📂 GitHub Repository</a> | 
-                <a href="/api/tools" target="_blank">🔌 API</a>
+                <a href="https://github.com/apathy-ca/dns_by_eye" target="_blank">📂 GitHub Repository</a> | 
+                <a href="/dns-by-eye/api/health" target="_blank">🔌 API Health</a>
             </p>
             <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
                 Created with ChatGPT, Cline & Anthropic (Claude Sonnet)
@@ -338,47 +287,17 @@
     </div>
     
     <script>
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const categories = document.querySelectorAll('.category');
-            
-            categories.forEach(category => {
-                const tools = category.querySelectorAll('.tool');
-                let hasVisibleTools = false;
-                
-                tools.forEach(tool => {
-                    const toolName = tool.querySelector('.tool-name').textContent.toLowerCase();
-                    const toolDescription = tool.querySelector('.tool-description').textContent.toLowerCase();
-                    const toolFeatures = Array.from(tool.querySelectorAll('.feature-tag'))
-                        .map(tag => tag.textContent.toLowerCase()).join(' ');
-                    
-                    const matches = toolName.includes(searchTerm) || 
-                                  toolDescription.includes(searchTerm) || 
-                                  toolFeatures.includes(searchTerm);
-                    
-                    tool.style.display = matches ? 'block' : 'none';
-                    if (matches) hasVisibleTools = true;
-                });
-                
-                category.style.display = hasVisibleTools ? 'block' : 'none';
-            });
-        });
-        
         // Add keyboard navigation
         document.addEventListener('keydown', function(e) {
-            if (e.key === '/' && !e.target.matches('input')) {
-                e.preventDefault();
-                document.getElementById('searchInput').focus();
+            if (e.key === 'Enter' && e.target.closest('.tool')) {
+                e.target.closest('.tool').click();
             }
         });
         
-        // Tool click analytics (if needed)
+        // Tool click analytics
         document.querySelectorAll('.tool').forEach(tool => {
             tool.addEventListener('click', function() {
-                const toolId = this.dataset.tool;
-                console.log(`Tool clicked: ${toolId}`);
-                // Add analytics tracking here if needed
+                console.log('DNS By Eye tool accessed');
             });
         });
     </script>
