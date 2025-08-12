@@ -147,6 +147,8 @@ else
     EMAIL_ARG="--register-unsafely-without-email"
 fi
 
+# Try to generate SSL certificate
+CERT_RESULT=0
 docker compose -f docker-compose-tools-ssl.yaml run --rm -p 80:80 certbot certonly \
     --standalone \
     $EMAIL_ARG \
@@ -154,19 +156,32 @@ docker compose -f docker-compose-tools-ssl.yaml run --rm -p 80:80 certbot certon
     --no-eff-email \
     --non-interactive \
     --verbose \
-    -d $DOMAIN
+    -d $DOMAIN || CERT_RESULT=$?
 
-# Check if certificate was created
-echo -e "${BLUE}Verifying certificate was created...${NC}"
+# Check if certificate was created or already exists
+echo -e "${BLUE}Verifying certificate status...${NC}"
 if docker compose -f docker-compose-tools-ssl.yaml run --rm --entrypoint="" certbot test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
-    echo -e "${GREEN}✓ SSL certificate generated successfully!${NC}"
-else
-    echo -e "${RED}✗ SSL certificate generation failed!${NC}"
-    echo "Common issues:"
+    echo -e "${GREEN}✓ SSL certificate is available!${NC}"
+elif [ $CERT_RESULT -ne 0 ]; then
+    echo -e "${YELLOW}⚠ SSL certificate generation failed (exit code: $CERT_RESULT)${NC}"
+    echo "This could be due to:"
+    echo "- Let's Encrypt rate limiting (too many certificates issued recently)"
     echo "- Domain doesn't point to this server"
     echo "- Port 80 is blocked by firewall"
     echo "- Another service is using port 80"
-    exit 1
+    echo ""
+    echo "You can:"
+    echo "1. Wait for rate limit to reset (up to 7 days)"
+    echo "2. Use existing certificates if available"
+    echo "3. Deploy without SSL using docker-compose-tools.yaml"
+    echo ""
+    read -p "Continue with deployment anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Deployment cancelled. You can retry later or use non-SSL deployment."
+        exit 1
+    fi
+    echo -e "${YELLOW}Continuing deployment without new SSL certificate...${NC}"
 fi
 
 # Start all services
