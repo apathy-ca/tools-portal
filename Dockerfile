@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy portal application
 COPY app.py .
+COPY gunicorn_config.py .
 COPY templates/ templates/
 COPY static/ static/
 
@@ -42,5 +43,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Run the application
-CMD ["python", "app.py"]
+# Run the application with gunicorn
+CMD ["gunicorn", "--config=gunicorn_config.py", "app:app"]

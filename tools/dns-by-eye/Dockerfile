@@ -38,5 +38,9 @@ ENV GUNICORN_CMD_ARGS="--config=gunicorn_config.py --capture-output --enable-std
 # Switch to non-root user
 USER appuser
 
-# Run the app with debug output and Flask development server
-CMD ["sh", "-c", "python -c 'import sys; print(sys.path); import flask; print(flask.__version__); import gunicorn; print(gunicorn.__version__)' && python -m flask run --host=0.0.0.0 --port=5000 --debug"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/api/health || exit 1
+
+# Run the app with gunicorn for production
+CMD ["gunicorn", "--config=gunicorn_config.py", "app.main:app"]
