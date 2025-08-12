@@ -1,0 +1,3 @@
+[submodule "tools/dns-by-eye"]
+	path = tools/dns-by-eye
+	url = ../dns_by_eye
