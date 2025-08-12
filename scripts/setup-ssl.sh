@@ -96,47 +96,18 @@ else
     fi
 fi
 
-# Stop existing services and clear Docker cache
+# Stop existing services
 echo -e "${BLUE}Stopping existing services...${NC}"
 docker compose -f docker-compose-tools-ssl.yaml down 2>/dev/null || true
 
-echo -e "${BLUE}Clearing Docker build cache and removing existing images...${NC}"
-docker system prune -a -f
-docker builder prune -a -f
-docker buildx prune -a -f 2>/dev/null || true
-
-# Remove any existing images for this project
+# Only remove project-specific images if they exist
+echo -e "${BLUE}Cleaning up project images...${NC}"
 docker images | grep -E "(tools-portal|dns-by-eye)" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
-# Clear any Docker Compose cache
-docker compose -f docker-compose-tools-ssl.yaml down --rmi all --volumes --remove-orphans 2>/dev/null || true
-
-# Force remove any dangling build contexts
-docker builder ls | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
-
-# Remove Docker's build cache directory entirely
-echo -e "${YELLOW}Removing Docker build cache directory...${NC}"
-rm -rf /var/lib/docker/buildkit 2>/dev/null || true
-rm -rf ~/.docker/buildx 2>/dev/null || true
-
-# Force remove all buildx builders and contexts
-echo -e "${YELLOW}Removing all Docker buildx builders...${NC}"
-docker buildx ls 2>/dev/null | grep -v "NAME" | awk '{print $1}' | xargs -r docker buildx rm -f 2>/dev/null || true
-docker buildx create --name temp-builder --use 2>/dev/null || true
-docker buildx rm temp-builder 2>/dev/null || true
-
-# Set Docker to use legacy builder
-echo -e "${YELLOW}Setting Docker to use legacy builder...${NC}"
+# Set Docker to use legacy builder (more reliable for our setup)
+echo -e "${BLUE}Configuring Docker builder...${NC}"
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
-
-# Restart Docker daemon to clear all caches (requires sudo)
-echo -e "${YELLOW}Restarting Docker daemon to clear all caches...${NC}"
-systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || echo "Could not restart Docker daemon - continuing anyway"
-sleep 10
-
-# Force remove any remaining build contexts after restart
-docker builder ls 2>/dev/null | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
 
 # Update submodules to latest commits
 echo -e "${BLUE}Updating submodules to latest commits...${NC}"
