@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# DNS By Eye SSL Setup Script
+# Tools Portal SSL Setup Script
 # Generic SSL setup for any domain using Let's Encrypt
 
 set -e
@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Function to display usage
 usage() {
-    echo -e "${BLUE}DNS By Eye SSL Setup${NC}"
+    echo -e "${BLUE}Tools Portal SSL Setup${NC}"
     echo "Usage: $0 <domain> [email]"
     echo ""
     echo "Arguments:"
@@ -29,6 +29,7 @@ usage() {
     echo "  - Domain must point to this server"
     echo "  - Ports 80 and 443 must be open"
     echo "  - Docker and docker-compose must be installed"
+    echo "  - Git submodules initialized (git submodule update --init --recursive)"
 }
 
 # Check arguments
@@ -40,7 +41,7 @@ fi
 DOMAIN=$1
 EMAIL=${2:-""}
 
-echo -e "${GREEN}DNS By Eye SSL Setup${NC}"
+echo -e "${GREEN}Tools Portal SSL Setup${NC}"
 echo "================================"
 echo -e "${YELLOW}Setting up SSL for domain: $DOMAIN${NC}"
 
@@ -97,89 +98,19 @@ fi
 
 # Stop existing services
 echo -e "${BLUE}Stopping existing services...${NC}"
-docker compose -f docker-compose.ssl.yaml down 2>/dev/null || true
+docker compose -f docker-compose-tools-ssl.yaml down 2>/dev/null || true
 
-# Create nginx configuration for SSL
-echo -e "${BLUE}Creating SSL nginx configuration...${NC}"
-cat > nginx.conf << EOF
-events {
-    worker_connections 1024;
-}
+# Check if nginx configuration exists and update domain
+echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
+if [ ! -f "nginx-tools-ssl.conf" ]; then
+    echo -e "${RED}Error: nginx-tools-ssl.conf not found!${NC}"
+    echo "Please ensure you're running this script from the tools-portal directory."
+    exit 1
+fi
 
-http {
-    upstream web {
-        server web:5000;
-    }
-
-    # Rate limiting
-    limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
-    limit_req_zone \$binary_remote_addr zone=general:10m rate=30r/s;
-
-    # Redirect HTTP to HTTPS
-    server {
-        listen 80;
-        server_name $DOMAIN;
-        
-        # Let's Encrypt challenge
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-        }
-        
-        # Redirect all other traffic to HTTPS
-        location / {
-            return 301 https://\$host\$request_uri;
-        }
-    }
-
-    # HTTPS server
-    server {
-        listen 443 ssl http2;
-        server_name $DOMAIN;
-
-        # SSL configuration
-        ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-        
-        # SSL security settings
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_prefer_server_ciphers off;
-        ssl_session_cache shared:SSL:10m;
-        ssl_session_timeout 10m;
-
-        # API endpoints with rate limiting
-        location /api/ {
-            limit_req zone=api burst=20 nodelay;
-            
-            proxy_pass http://web;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
-            
-            # API-specific headers
-            add_header Access-Control-Allow-Origin "*" always;
-            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
-        }
-
-        # Main application
-        location / {
-            limit_req zone=general burst=50 nodelay;
-            
-            proxy_pass http://web;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
-            
-            # Timeouts
-            proxy_connect_timeout 60s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
-        }
-    }
-}
-EOF
+# Update the domain in the nginx configuration
+sed -i.bak "s/server_name [^;]*/server_name $DOMAIN/g" nginx-tools-ssl.conf
+echo -e "${GREEN}✓ Updated nginx configuration with domain: $DOMAIN${NC}"
 
 # Generate SSL certificate
 echo -e "${BLUE}Generating SSL certificate...${NC}"
@@ -189,7 +120,7 @@ else
     EMAIL_ARG="--register-unsafely-without-email"
 fi
 
-docker compose -f docker-compose.ssl.yaml run --rm -p 80:80 certbot certonly \
+docker compose -f docker-compose-tools-ssl.yaml run --rm -p 80:80 certbot certonly \
     --standalone \
     $EMAIL_ARG \
     --agree-tos \
@@ -200,7 +131,7 @@ docker compose -f docker-compose.ssl.yaml run --rm -p 80:80 certbot certonly \
 
 # Check if certificate was created
 echo -e "${BLUE}Verifying certificate was created...${NC}"
-if docker compose -f docker-compose.ssl.yaml run --rm --entrypoint="" certbot test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
+if docker compose -f docker-compose-tools-ssl.yaml run --rm --entrypoint="" certbot test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
     echo -e "${GREEN}✓ SSL certificate generated successfully!${NC}"
 else
     echo -e "${RED}✗ SSL certificate generation failed!${NC}"
@@ -213,7 +144,7 @@ fi
 
 # Start all services
 echo -e "${BLUE}Starting all services with SSL...${NC}"
-docker compose -f docker-compose.ssl.yaml up -d
+docker compose -f docker-compose-tools-ssl.yaml up -d
 
 # Wait for services to start
 sleep 15
@@ -224,18 +155,20 @@ if curl -I -m 10 https://$DOMAIN 2>/dev/null | grep -q "200 OK"; then
     echo -e "${GREEN}✓ HTTPS is working correctly!${NC}"
 else
     echo -e "${YELLOW}Warning: HTTPS test failed, but services are running${NC}"
-    echo "Check the logs: docker compose -f docker-compose.ssl.yaml logs"
+    echo "Check the logs: docker compose -f docker-compose-tools-ssl.yaml logs"
 fi
 
 echo -e "${GREEN}SSL setup complete!${NC}"
 echo ""
-echo "Your DNS By Eye instance is now available at:"
+echo "Your Tools Portal instance is now available at:"
 echo -e "${GREEN}https://$DOMAIN${NC}"
+echo "DNS By Eye is available at:"
+echo -e "${GREEN}https://$DOMAIN/dns-by-eye/${NC}"
 echo ""
 echo "Management commands:"
-echo "  View logs:      docker compose -f docker-compose.ssl.yaml logs -f"
-echo "  Restart:        docker compose -f docker-compose.ssl.yaml restart"
-echo "  Stop:           docker compose -f docker-compose.ssl.yaml down"
-echo "  Renew certs:    docker compose -f docker-compose.ssl.yaml run --rm certbot renew"
+echo "  View logs:      docker compose -f docker-compose-tools-ssl.yaml logs -f"
+echo "  Restart:        docker compose -f docker-compose-tools-ssl.yaml restart"
+echo "  Stop:           docker compose -f docker-compose-tools-ssl.yaml down"
+echo "  Renew certs:    docker compose -f docker-compose-tools-ssl.yaml run --rm certbot renew"
 echo ""
 echo "Certificate auto-renewal is configured to run every 12 hours."
