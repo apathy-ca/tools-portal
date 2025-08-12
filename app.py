@@ -4,9 +4,10 @@ Tools Portal - Main Application
 A collection of useful network and system administration tools.
 """
 
-from flask import Flask, render_template, send_from_directory, jsonify
+from flask import Flask, render_template, send_from_directory, jsonify, request, redirect
 import os
 import json
+import sys
 from datetime import datetime
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -77,6 +78,35 @@ def health_check():
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'tools_available': len(TOOLS)
     })
+
+@app.route('/dns-by-eye/')
+@app.route('/dns-by-eye/<path:path>')
+def dns_by_eye_tool(path=''):
+    """Route DNS By Eye tool requests."""
+    try:
+        # Add the DNS By Eye app directory to Python path
+        dns_by_eye_path = os.path.join(os.path.dirname(__file__), 'tools', 'dns-by-eye')
+        if dns_by_eye_path not in sys.path:
+            sys.path.insert(0, dns_by_eye_path)
+        
+        # Import the DNS By Eye app
+        from app.main import app as dns_app
+        
+        # Handle the request using DNS By Eye app
+        with dns_app.test_request_context(f'/{path}', method=request.method, 
+                                        query_string=request.query_string,
+                                        data=request.get_data(),
+                                        headers=request.headers):
+            try:
+                response = dns_app.full_dispatch_request()
+                return response.get_data(as_text=True), response.status_code, dict(response.headers)
+            except Exception as e:
+                # If DNS By Eye app fails, show a helpful error
+                return render_template('500.html'), 500
+                
+    except ImportError as e:
+        # DNS By Eye not available, show error message
+        return f"DNS By Eye tool is not available. Error: {str(e)}", 503
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
