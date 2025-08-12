@@ -114,10 +114,18 @@ docker compose -f docker-compose-tools-ssl.yaml down --rmi all --volumes --remov
 # Force remove any dangling build contexts
 docker builder ls | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
 
+# Remove Docker's build cache directory entirely
+echo -e "${YELLOW}Removing Docker build cache directory...${NC}"
+rm -rf /var/lib/docker/buildkit 2>/dev/null || true
+rm -rf ~/.docker/buildx 2>/dev/null || true
+
 # Restart Docker daemon to clear all caches (requires sudo)
 echo -e "${YELLOW}Restarting Docker daemon to clear all caches...${NC}"
 systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || echo "Could not restart Docker daemon - continuing anyway"
-sleep 5
+sleep 10
+
+# Force remove any remaining build contexts after restart
+docker builder ls 2>/dev/null | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
 
 # Check if nginx configuration exists and update domain
 echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
