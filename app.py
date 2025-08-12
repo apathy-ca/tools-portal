@@ -80,44 +80,94 @@ def health_check():
     })
 
 @app.route('/dns-by-eye/')
+def dns_by_eye_redirect():
+    """Redirect to DNS By Eye tool with helpful message."""
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DNS By Eye - Tools Portal</title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                color: white;
+                text-align: center;
+            }
+            .container {
+                max-width: 600px;
+                padding: 2rem;
+            }
+            .title {
+                font-size: 2.5rem;
+                margin-bottom: 1rem;
+            }
+            .message {
+                font-size: 1.2rem;
+                margin-bottom: 2rem;
+                opacity: 0.9;
+            }
+            .button {
+                background: rgba(255, 255, 255, 0.2);
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                padding: 1rem 2rem;
+                border-radius: 10px;
+                text-decoration: none;
+                display: inline-block;
+                transition: all 0.3s ease;
+                backdrop-filter: blur(10px);
+                margin: 0.5rem;
+            }
+            .button:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: translateY(-2px);
+            }
+            .info {
+                margin-top: 2rem;
+                padding: 1rem;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                backdrop-filter: blur(10px);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="title">🔍 DNS By Eye</div>
+            <div class="message">
+                DNS delegation visualizer with health scoring and glue record analysis
+            </div>
+            <a href="/" class="button">🏠 Back to Tools Portal</a>
+            <div class="info">
+                <h3>🚧 Tool Integration in Progress</h3>
+                <p>DNS By Eye is being integrated into the new Tools Portal architecture. 
+                The tool will be available shortly at this location.</p>
+                <p><strong>Features:</strong></p>
+                <ul style="text-align: left; display: inline-block;">
+                    <li>DNS delegation tracing</li>
+                    <li>Visual graph generation</li>
+                    <li>Health score calculation</li>
+                    <li>Smart graph condensation (4+ nameservers)</li>
+                    <li>Enhanced glue record analysis</li>
+                </ul>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+
 @app.route('/dns-by-eye/<path:path>')
-def dns_by_eye_tool(path=''):
-    """Route DNS By Eye tool requests."""
-    try:
-        # Add the DNS By Eye app directory to Python path
-        dns_by_eye_path = os.path.join(os.path.dirname(__file__), 'tools', 'dns-by-eye')
-        if dns_by_eye_path not in sys.path:
-            sys.path.insert(0, dns_by_eye_path)
-        
-        # Import the DNS By Eye app
-        from app.main import app as dns_app
-        
-        # Create a test client and make the request
-        with dns_app.test_client() as client:
-            # Forward the request to DNS By Eye
-            if request.method == 'GET':
-                response = client.get(f'/{path}', query_string=request.query_string)
-            elif request.method == 'POST':
-                response = client.post(f'/{path}', 
-                                     data=request.get_data(),
-                                     content_type=request.content_type,
-                                     query_string=request.query_string)
-            else:
-                response = client.open(f'/{path}', 
-                                     method=request.method,
-                                     data=request.get_data(),
-                                     content_type=request.content_type,
-                                     query_string=request.query_string)
-            
-            # Return the response from DNS By Eye
-            return response.get_data(as_text=True), response.status_code, dict(response.headers)
-                
-    except ImportError as e:
-        # DNS By Eye not available, show error message
-        return f"DNS By Eye tool is not available. Error: {str(e)}", 503
-    except Exception as e:
-        # Other errors
-        return f"Error loading DNS By Eye: {str(e)}", 500
+def dns_by_eye_subpaths(path):
+    """Handle DNS By Eye subpaths."""
+    return redirect('/dns-by-eye/')
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
