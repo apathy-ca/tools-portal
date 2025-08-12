@@ -442,8 +442,9 @@ def api_delegation():
                         dot.node(ns, ns)
                         dot.edge(zone, ns)
                 
-                # Save graph
-                filename = domain.replace('.', '_') + '_' + str(i)
+                # Save graph with unique timestamp
+                timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
+                filename = domain.replace('.', '_') + '_' + str(i) + '_' + timestamp
                 dot.render("static/generated/" + filename, format='png', cleanup=True)
                 graph_urls.append(url_for('static', filename='generated/' + filename + '.png'))
         except Exception as e:
@@ -505,8 +506,9 @@ def api_delegation():
                                     # Always add a one-way arrow from this nameserver to the referenced one
                                     dot.edge(ns, ref_key, color='blue', penwidth='2')
                 
-                # Save graph
-                filename = domain.replace('.', '_') + "_domain_report"
+                # Save graph with unique timestamp
+                timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
+                filename = domain.replace('.', '_') + "_domain_report_" + timestamp
                 dot.render("static/generated/" + filename, format='png', cleanup=True)
                 domain_report_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
@@ -536,8 +538,9 @@ def api_delegation():
                                 dot.node(ip, ip, shape='ellipse')
                                 dot.edge(ns, ip, color='green')
                 
-                # Save graph
-                filename = domain.replace('.', '_') + "_glue_analysis"
+                # Save graph with unique timestamp
+                timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
+                filename = domain.replace('.', '_') + "_glue_analysis_" + timestamp
                 dot.render("static/generated/" + filename, format='png', cleanup=True)
                 glue_analysis_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
