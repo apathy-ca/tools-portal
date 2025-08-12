@@ -33,8 +33,10 @@ WORKDIR /app
 COPY --from=dns-by-eye-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY tools/ tools/
 
-# Create directories for generated files
-RUN mkdir -p tools/dns-by-eye/app/static/generated
+# Create directories for generated files and logs
+RUN mkdir -p tools/dns-by-eye/app/static/generated && \
+    mkdir -p /var/log/gunicorn && \
+    chmod 755 /var/log/gunicorn
 
 # Expose port
 EXPOSE 5000
