@@ -138,6 +138,10 @@ sleep 10
 # Force remove any remaining build contexts after restart
 docker builder ls 2>/dev/null | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
 
+# Update submodules to latest commits
+echo -e "${BLUE}Updating submodules to latest commits...${NC}"
+git submodule update --remote --force 2>/dev/null || git submodule update --init --recursive
+
 # Check if nginx configuration exists and update domain
 echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
 if [ ! -f "nginx-tools-ssl.conf" ]; then
