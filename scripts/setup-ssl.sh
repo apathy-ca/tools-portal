@@ -152,6 +152,7 @@ fi
 
 # Update the domain in the nginx configuration
 sed -i.bak "s/server_name [^;]*/server_name $DOMAIN/g" nginx-tools-ssl.conf
+sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/$DOMAIN/|g" nginx-tools-ssl.conf
 echo -e "${GREEN}✓ Updated nginx configuration with domain: $DOMAIN${NC}"
 
 # Generate SSL certificate
