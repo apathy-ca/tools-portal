@@ -72,8 +72,9 @@ services:
       - certbot_www:/var/www/certbot
     networks:
       - tools-network
+    entrypoint: "/bin/sh"
     command: >
-      sh -c "
+      -c "
         while true; do
           echo 'Certbot renewal check...'
           certbot renew --quiet --no-self-upgrade
