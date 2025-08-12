@@ -177,16 +177,79 @@ echo -e "${BLUE}Starting all services with SSL...${NC}"
 DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f docker-compose-tools-ssl.yaml build --no-cache
 DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f docker-compose-tools-ssl.yaml up -d
 
-# Wait for services to start
-sleep 15
+# Wait for services to start and check health
+echo -e "${BLUE}Waiting for services to start...${NC}"
+sleep 10
 
-# Test the setup
-echo -e "${BLUE}Testing SSL setup...${NC}"
-if curl -I -m 10 https://$DOMAIN 2>/dev/null | grep -q "200 OK"; then
-    echo -e "${GREEN}✓ HTTPS is working correctly!${NC}"
+# Check if nginx is running and has loaded SSL certificates
+echo -e "${BLUE}Checking nginx SSL configuration...${NC}"
+NGINX_RUNNING=false
+SSL_CERT_LOADED=false
+
+for i in {1..6}; do
+    if docker compose -f docker-compose-tools-ssl.yaml ps nginx | grep -q "Up"; then
+        NGINX_RUNNING=true
+        echo -e "${GREEN}✓ Nginx is running${NC}"
+        break
+    fi
+    echo "Waiting for nginx to start... ($i/6)"
+    sleep 5
+done
+
+if [ "$NGINX_RUNNING" = false ]; then
+    echo -e "${RED}✗ Nginx failed to start${NC}"
+    echo "Check nginx logs: docker compose -f docker-compose-tools-ssl.yaml logs nginx"
+    exit 1
+fi
+
+# Check if SSL certificate files exist
+if docker compose -f docker-compose-tools-ssl.yaml exec nginx test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem 2>/dev/null; then
+    SSL_CERT_LOADED=true
+    echo -e "${GREEN}✓ SSL certificate files are accessible to nginx${NC}"
 else
-    echo -e "${YELLOW}Warning: HTTPS test failed, but services are running${NC}"
-    echo "Check the logs: docker compose -f docker-compose-tools-ssl.yaml logs"
+    echo -e "${YELLOW}⚠ SSL certificate files not found or not accessible${NC}"
+fi
+
+# Test the setup with better error handling
+echo -e "${BLUE}Testing HTTPS connectivity...${NC}"
+HTTPS_TEST_RESULT=""
+HTTP_STATUS=""
+
+# Try HTTPS test with more detailed output
+HTTPS_TEST_RESULT=$(curl -I -m 15 -k https://$DOMAIN 2>&1)
+HTTP_STATUS=$(echo "$HTTPS_TEST_RESULT" | head -n1 | grep -o "HTTP/[0-9.]* [0-9]*" | grep -o "[0-9]*$" || echo "")
+
+if echo "$HTTPS_TEST_RESULT" | grep -q "200"; then
+    echo -e "${GREEN}✓ HTTPS is working correctly! (Status: $HTTP_STATUS)${NC}"
+elif echo "$HTTPS_TEST_RESULT" | grep -q "curl:"; then
+    echo -e "${RED}✗ HTTPS connection failed${NC}"
+    echo "Error details:"
+    echo "$HTTPS_TEST_RESULT"
+    echo ""
+    echo "Common causes:"
+    echo "- SSL certificate not properly loaded"
+    echo "- Nginx configuration error"
+    echo "- Firewall blocking port 443"
+    echo "- Certificate validation issues"
+    echo ""
+    echo "Diagnostic commands:"
+    echo "  Check nginx config: docker compose -f docker-compose-tools-ssl.yaml exec nginx nginx -t"
+    echo "  Check certificate: docker compose -f docker-compose-tools-ssl.yaml exec nginx openssl x509 -in /etc/letsencrypt/live/$DOMAIN/fullchain.pem -text -noout"
+    echo "  Check nginx logs: docker compose -f docker-compose-tools-ssl.yaml logs nginx"
+else
+    echo -e "${YELLOW}⚠ HTTPS test returned unexpected result (Status: $HTTP_STATUS)${NC}"
+    echo "Response details:"
+    echo "$HTTPS_TEST_RESULT"
+fi
+
+# Test HTTP to HTTPS redirect
+echo -e "${BLUE}Testing HTTP to HTTPS redirect...${NC}"
+HTTP_REDIRECT_RESULT=$(curl -I -m 10 http://$DOMAIN 2>&1)
+if echo "$HTTP_REDIRECT_RESULT" | grep -q "301\|302"; then
+    echo -e "${GREEN}✓ HTTP to HTTPS redirect is working${NC}"
+else
+    echo -e "${YELLOW}⚠ HTTP redirect test failed${NC}"
+    echo "Response: $HTTP_REDIRECT_RESULT"
 fi
 
 echo -e "${GREEN}SSL setup complete!${NC}"
