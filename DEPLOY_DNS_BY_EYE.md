@@ -25,8 +25,9 @@ sudo docker ps
 **Note**: The latest update includes:
 - ✅ **SSL Support**: Full HTTPS with Let's Encrypt certificates
 - ✅ **Microservices Architecture**: Separate DNS By Eye and Tools Portal services
-- ✅ **Nginx Configuration**: Fixed rate limiting and service routing
-- ✅ **Production Ready**: All security headers and optimizations
+- ✅ **Production Servers**: Both services use gunicorn (not Flask dev server)
+- ✅ **Nginx Configuration**: Fixed rate limiting, service routing, and http2 directive
+- ✅ **Stability Fixes**: Resolves 502 Bad Gateway and connection refused errors
 
 ## ✅ What This Provides
 
