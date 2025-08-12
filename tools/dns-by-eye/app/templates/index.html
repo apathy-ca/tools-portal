@@ -252,7 +252,7 @@ if __name__ == "__main__":
         // Load DNS servers on page load
         async function loadDnsServers() {
             try {
-                const resp = await fetch('/api/dns-servers');
+                const resp = await fetch('/dns-by-eye/api/dns-servers');
                 const servers = await resp.json();
                 const select = document.getElementById('dnsServerSelect');
                 
@@ -617,7 +617,7 @@ if __name__ == "__main__":
             if (domains.length === 1) {
                 // Single domain analysis
                 try {
-                    resp = await fetch('/api/delegation', {
+                    resp = await fetch('/dns-by-eye/api/delegation', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ domain: domains[0], verbose, dns_server, check_glue })
@@ -744,7 +744,7 @@ if __name__ == "__main__":
             } else {
                 // Multi-domain comparison
                 try {
-                    resp = await fetch('/api/compare', {
+                    resp = await fetch('/dns-by-eye/api/compare', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ domains, verbose, dns_server, debug })
@@ -925,7 +925,7 @@ if __name__ == "__main__":
                 debug: currentQueryData.debug
             });
             
-            window.open(`/api/export/${currentQueryData.domain}?${params}`, '_blank');
+            window.open(`/dns-by-eye/api/export/${currentQueryData.domain}?${params}`, '_blank');
         });
 
         document.getElementById('exportCsvBtn').addEventListener('click', function() {
@@ -946,7 +946,7 @@ if __name__ == "__main__":
                 debug: currentQueryData.debug
             });
             
-            window.open(`/api/export/${currentQueryData.domain}?${params}`, '_blank');
+            window.open(`/dns-by-eye/api/export/${currentQueryData.domain}?${params}`, '_blank');
         });
 
         // Add copy-to-clipboard functionality for code examples
