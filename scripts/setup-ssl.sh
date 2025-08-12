@@ -119,6 +119,17 @@ echo -e "${YELLOW}Removing Docker build cache directory...${NC}"
 rm -rf /var/lib/docker/buildkit 2>/dev/null || true
 rm -rf ~/.docker/buildx 2>/dev/null || true
 
+# Force remove all buildx builders and contexts
+echo -e "${YELLOW}Removing all Docker buildx builders...${NC}"
+docker buildx ls 2>/dev/null | grep -v "NAME" | awk '{print $1}' | xargs -r docker buildx rm -f 2>/dev/null || true
+docker buildx create --name temp-builder --use 2>/dev/null || true
+docker buildx rm temp-builder 2>/dev/null || true
+
+# Set Docker to use legacy builder
+echo -e "${YELLOW}Setting Docker to use legacy builder...${NC}"
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+
 # Restart Docker daemon to clear all caches (requires sudo)
 echo -e "${YELLOW}Restarting Docker daemon to clear all caches...${NC}"
 systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || echo "Could not restart Docker daemon - continuing anyway"
@@ -186,8 +197,8 @@ fi
 
 # Start all services
 echo -e "${BLUE}Starting all services with SSL...${NC}"
-docker compose -f docker-compose-tools-ssl.yaml build --no-cache
-docker compose -f docker-compose-tools-ssl.yaml up -d
+DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f docker-compose-tools-ssl.yaml build --no-cache
+DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f docker-compose-tools-ssl.yaml up -d
 
 # Wait for services to start
 sleep 15
