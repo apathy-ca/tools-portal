@@ -408,7 +408,8 @@ def api_delegation():
         try:
             # Ensure the generated directory exists
             import os
-            os.makedirs("static/generated", exist_ok=True)
+            generated_dir = os.path.join(app.static_folder, 'generated')
+            os.makedirs(generated_dir, exist_ok=True)
             
             for i, node in enumerate(trace):
                 zone = node['zone']
@@ -445,7 +446,8 @@ def api_delegation():
                 # Save graph with unique timestamp
                 timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
                 filename = domain.replace('.', '_') + '_' + str(i) + '_' + timestamp
-                dot.render("static/generated/" + filename, format='png', cleanup=True)
+                graph_path = os.path.join(generated_dir, filename)
+                dot.render(graph_path, format='png', cleanup=True)
                 graph_urls.append(url_for('static', filename='generated/' + filename + '.png'))
         except Exception as e:
             app.logger.error("Error generating graphs: " + str(e))
@@ -455,7 +457,8 @@ def api_delegation():
         if cross_ref_results:
             try:
                 # Ensure the generated directory exists
-                os.makedirs("static/generated", exist_ok=True)
+                generated_dir = os.path.join(app.static_folder, 'generated')
+                os.makedirs(generated_dir, exist_ok=True)
                 dot = Digraph(comment='Domain Report for ' + domain)
                 dot.attr(rankdir='TB')  # Top->down layout
                 
@@ -509,7 +512,8 @@ def api_delegation():
                 # Save graph with unique timestamp
                 timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
                 filename = domain.replace('.', '_') + "_domain_report_" + timestamp
-                dot.render("static/generated/" + filename, format='png', cleanup=True)
+                graph_path = os.path.join(generated_dir, filename)
+                dot.render(graph_path, format='png', cleanup=True)
                 domain_report_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
                 app.logger.error("Error generating Domain Report graph: " + str(e))
@@ -541,7 +545,8 @@ def api_delegation():
                 # Save graph with unique timestamp
                 timestamp = str(int(time.time() * 1000))  # Millisecond timestamp
                 filename = domain.replace('.', '_') + "_glue_analysis_" + timestamp
-                dot.render("static/generated/" + filename, format='png', cleanup=True)
+                graph_path = os.path.join(generated_dir, filename)
+                dot.render(graph_path, format='png', cleanup=True)
                 glue_analysis_graph_url = url_for('static', filename='generated/' + filename + '.png')
             except Exception as e:
                 app.logger.error("Error generating Glue Analysis graph: " + str(e))
