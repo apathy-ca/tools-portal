@@ -22,8 +22,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 import html
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
+app = Flask(__name__, static_folder="static", static_url_path="/dns-by-eye/static")
 app.config.from_object(Config)
+
+# Configure application to work under /dns-by-eye/ path
+app.config['APPLICATION_ROOT'] = '/dns-by-eye'
 
 # Initialize compression
 compress = Compress(app)
