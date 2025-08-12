@@ -100,10 +100,16 @@ fi
 echo -e "${BLUE}Stopping existing services...${NC}"
 docker compose -f docker-compose-tools-ssl.yaml down 2>/dev/null || true
 
-echo -e "${BLUE}Clearing Docker build cache...${NC}"
+echo -e "${BLUE}Clearing Docker build cache and removing existing images...${NC}"
 docker system prune -a -f
 docker builder prune -a -f
 docker buildx prune -a -f 2>/dev/null || true
+
+# Remove any existing images for this project
+docker images | grep -E "(tools-portal|dns-by-eye)" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+
+# Clear any Docker Compose cache
+docker compose -f docker-compose-tools-ssl.yaml down --rmi all --volumes --remove-orphans 2>/dev/null || true
 
 # Check if nginx configuration exists and update domain
 echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
@@ -149,7 +155,7 @@ fi
 
 # Start all services
 echo -e "${BLUE}Starting all services with SSL...${NC}"
-docker compose -f docker-compose-tools-ssl.yaml up -d
+docker compose -f docker-compose-tools-ssl.yaml up -d --build --no-cache
 
 # Wait for services to start
 sleep 15
