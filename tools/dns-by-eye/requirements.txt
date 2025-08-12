@@ -1,9 +1,0 @@
-Flask==2.3.2
-dnspython==2.6.1
-graphviz==0.20.3
-Flask-Caching==2.0.2
-Flask-Compress==1.14
-gunicorn==21.2.0
-Flask-Limiter==3.5.0
-gevent==23.9.1
-Werkzeug==2.3.7
