@@ -406,6 +406,10 @@ def api_delegation():
         # Generate graphs for each level
         graph_urls = []
         try:
+            # Ensure the generated directory exists
+            import os
+            os.makedirs("static/generated", exist_ok=True)
+            
             for i, node in enumerate(trace):
                 zone = node['zone']
                 dot = Digraph(comment='DNS Delegation Graph for ' + zone)
@@ -449,6 +453,8 @@ def api_delegation():
         domain_report_graph_url = None
         if cross_ref_results:
             try:
+                # Ensure the generated directory exists
+                os.makedirs("static/generated", exist_ok=True)
                 dot = Digraph(comment='Domain Report for ' + domain)
                 dot.attr(rankdir='TB')  # Top->down layout
                 
