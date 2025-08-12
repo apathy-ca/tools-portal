@@ -155,7 +155,8 @@ fi
 
 # Start all services
 echo -e "${BLUE}Starting all services with SSL...${NC}"
-docker compose -f docker-compose-tools-ssl.yaml up -d --build --no-cache
+docker compose -f docker-compose-tools-ssl.yaml build --no-cache
+docker compose -f docker-compose-tools-ssl.yaml up -d
 
 # Wait for services to start
 sleep 15
