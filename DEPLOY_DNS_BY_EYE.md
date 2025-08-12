@@ -9,15 +9,23 @@ DNS By Eye is currently showing an informational page instead of the actual tool
 Run these commands on your server to make DNS By Eye functional:
 
 ```bash
-# Pull latest code
+# Pull latest code (includes nginx and app.py fixes)
 sudo git pull origin main
 
 # Stop current deployment
-sudo docker compose -f docker-compose.ssl.yaml down
+sudo docker compose -f docker-compose-tools.yaml down 2>/dev/null || sudo docker compose -f docker-compose.ssl.yaml down
 
 # Deploy microservices architecture with functional DNS By Eye
 sudo docker compose -f docker-compose-tools.yaml up -d --build
+
+# Check status (all containers should be running)
+sudo docker ps
 ```
+
+**Note**: The latest update includes fixes for:
+- Nginx configuration errors (`limit_req_zone` directive placement)
+- Tools-portal container restart issues
+- Service connectivity problems
 
 ## ✅ What This Provides
 
