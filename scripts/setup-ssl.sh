@@ -96,9 +96,12 @@ else
     fi
 fi
 
-# Stop existing services
+# Stop existing services and clear Docker cache
 echo -e "${BLUE}Stopping existing services...${NC}"
 docker compose -f docker-compose-tools-ssl.yaml down 2>/dev/null || true
+
+echo -e "${BLUE}Clearing Docker build cache...${NC}"
+docker system prune -a -f
 
 # Check if nginx configuration exists and update domain
 echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
