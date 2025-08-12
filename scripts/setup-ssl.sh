@@ -111,6 +111,14 @@ docker images | grep -E "(tools-portal|dns-by-eye)" | awk '{print $3}' | xargs -
 # Clear any Docker Compose cache
 docker compose -f docker-compose-tools-ssl.yaml down --rmi all --volumes --remove-orphans 2>/dev/null || true
 
+# Force remove any dangling build contexts
+docker builder ls | grep -v "NAME" | awk '{print $1}' | xargs -r docker builder rm -f 2>/dev/null || true
+
+# Restart Docker daemon to clear all caches (requires sudo)
+echo -e "${YELLOW}Restarting Docker daemon to clear all caches...${NC}"
+systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || echo "Could not restart Docker daemon - continuing anyway"
+sleep 5
+
 # Check if nginx configuration exists and update domain
 echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
 if [ ! -f "nginx-tools-ssl.conf" ]; then
