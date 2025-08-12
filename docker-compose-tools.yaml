@@ -29,6 +29,7 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
+      - STATIC_URL_PATH=/dns-by-eye/static
     volumes:
       - ./tools/dns-by-eye/app/static/generated:/app/app/static/generated
     networks:
