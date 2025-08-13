@@ -114,9 +114,9 @@ services:
           find /cleanup -name '*.png' -type f -mtime +7 -delete 2>/dev/null || true
           find /cleanup -name '*.svg' -type f -mtime +7 -delete 2>/dev/null || true
           echo 'Cleaning up if more than 1000 files exist...'
-          file_count=\$(find /cleanup -name '*.png' -type f | wc -l)
-          if [ \$file_count -gt 1000 ]; then
-            echo 'Too many files (\$file_count), cleaning oldest...'
+          file_count=\$$(find /cleanup -name '*.png' -type f | wc -l)
+          if [ \$$file_count -gt 1000 ]; then
+            echo 'Too many files ('\$$file_count'), cleaning oldest...'
             find /cleanup -name '*.png' -type f -printf '%T@ %p\n' | sort -n | head -n 500 | cut -d' ' -f2- | xargs rm -f 2>/dev/null || true
           fi
           echo 'Cleanup completed. Sleeping for 24 hours...'
