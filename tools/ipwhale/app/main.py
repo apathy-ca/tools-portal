@@ -221,6 +221,28 @@ def lookup_asn(ip):
         app.logger.debug(f"ASN lookup failed for {ip}: {str(e)}")
         return None
 
+def lookup_asn_name(asn):
+    """Lookup friendly ASN name using DNS-based lookups."""
+    try:
+        if not asn or asn == '0':
+            return None
+        
+        # Use asn.cymru.com for ASN name lookup
+        query_name = f"AS{asn}.asn.cymru.com"
+        txt_records = resolver.resolve(query_name, 'TXT')
+        
+        for record in txt_records:
+            # Parse the TXT record: "ASN | CC | Registry | Allocated | AS Name"
+            parts = record.to_text().strip('"').split(' | ')
+            if len(parts) >= 5:
+                as_name = parts[4].strip()
+                return as_name if as_name else None
+        
+        return None
+    except Exception as e:
+        app.logger.debug(f"ASN name lookup failed for {asn}: {str(e)}")
+        return None
+
 def detect_ip_version(ip):
     """Detect if an IP is IPv4 or IPv6."""
     if is_valid_ipv4(ip):
@@ -268,6 +290,9 @@ def index():
     server_info = get_server_info()
     client_ip = client_info['ip']
     
+    # Generate timestamp for this query
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+    
     # Determine IP versions
     ipv4_address = None
     ipv6_address = None
@@ -286,6 +311,10 @@ def index():
     ipv4_asn = lookup_asn(ipv4_address) if ipv4_address else None
     ipv6_asn = lookup_asn(ipv6_address) if ipv6_address else None
     
+    # Get ASN names
+    ipv4_asn_name = lookup_asn_name(ipv4_asn) if ipv4_asn else None
+    ipv6_asn_name = lookup_asn_name(ipv6_asn) if ipv6_asn else None
+    
     # Format PTR records for display
     ipv4_ptr_display = ipv4_ptr[0] if ipv4_ptr else None
     ipv6_ptr_display = ipv6_ptr[0] if ipv6_ptr else None
@@ -297,10 +326,13 @@ def index():
                          ipv6_ptr=ipv6_ptr_display,
                          ipv4_asn=ipv4_asn,
                          ipv6_asn=ipv6_asn,
+                         ipv4_asn_name=ipv4_asn_name,
+                         ipv6_asn_name=ipv6_asn_name,
                          remote_port=client_info['remote_port'],
                          user_agent=client_info['user_agent'],
                          nat_detection=client_info['nat_detection'],
-                         server_info=server_info)
+                         server_info=server_info,
+                         timestamp=timestamp)
 
 @app.route('/api/ip')
 @handle_errors

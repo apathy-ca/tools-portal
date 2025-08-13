@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP Whale! - Your IP Address Information</title>
+    <title>IP Whale - Your IP Address Information</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='whale_eye_favicon.png') }}">
     <style>
         body {
@@ -288,30 +288,22 @@
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{ url_for('static', filename='whale_eye_200x200.png') }}" alt="IP Whale Logo" style="width: 120px; height: 120px; margin-bottom: 10px;">
-            <h1>IP Whale!</h1>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
+                <img src="{{ url_for('static', filename='whale_eye_200x200.png') }}" alt="IP Whale Logo" style="width: 60px; height: 60px;">
+                <h1>IP Whale</h1>
+            </div>
             <div class="subtitle">This website will tell you your IP[v4|v6] addresses.</div>
         </div>
 
         <div class="info-section">
+            <!-- IPv4 Information -->
             <div class="info-row">
-                <span class="label">Your IPv6 address is:</span>
-                <span class="value {{ 'none-value' if not ipv6_address }}">
-                    {{ ipv6_address or 'None' }}
-                </span>
-            </div>
-            
-            <div class="info-row">
-                <span class="label">Your IPv4 address is:</span>
+                <span class="label">Your public IPv4 address is:</span>
                 <span class="value {{ 'none-value' if not ipv4_address }}">
                     {{ ipv4_address or 'None' }}
-                </span>
-            </div>
-            
-            <div class="info-row">
-                <span class="label">Your IPv6 PTR is:</span>
-                <span class="value {{ 'none-value' if not ipv6_ptr }}">
-                    {{ ipv6_ptr or 'None' }}
+                    {% if ipv4_address and nat_detection.detected %}
+                    <span style="color: #f39c12; font-size: 0.9em;"> (via NAT)</span>
+                    {% endif %}
                 </span>
             </div>
             
@@ -323,22 +315,53 @@
             </div>
             
             <div class="info-row">
-                <span class="label">Your IPv6 source ASN is:</span>
-                <span class="value {{ 'none-value' if not ipv6_asn }}">
-                    {{ ipv6_asn or 'None' }}
+                <span class="label">Your IPv4 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv4_asn }}">
+                    {% if ipv4_asn %}
+                        {{ ipv4_asn }}{% if ipv4_asn_name %} ({{ ipv4_asn_name }}){% endif %}
+                    {% else %}
+                        None
+                    {% endif %}
+                </span>
+            </div>
+            
+            <!-- IPv6 Information -->
+            <div class="info-row">
+                <span class="label">Your public IPv6 address is:</span>
+                <span class="value {{ 'none-value' if not ipv6_address }}">
+                    {{ ipv6_address or 'None' }}
+                    {% if ipv6_address and nat_detection.detected %}
+                    <span style="color: #f39c12; font-size: 0.9em;"> (via NAT)</span>
+                    {% endif %}
                 </span>
             </div>
             
             <div class="info-row">
-                <span class="label">Your IPv4 source ASN is:</span>
-                <span class="value {{ 'none-value' if not ipv4_asn }}">
-                    {{ ipv4_asn or 'None' }}
+                <span class="label">Your IPv6 PTR is:</span>
+                <span class="value {{ 'none-value' if not ipv6_ptr }}">
+                    {{ ipv6_ptr or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv6 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv6_asn }}">
+                    {% if ipv6_asn %}
+                        {{ ipv6_asn }}{% if ipv6_asn_name %} ({{ ipv6_asn_name }}){% endif %}
+                    {% else %}
+                        None
+                    {% endif %}
                 </span>
             </div>
         </div>
 
         <div class="advanced-section">
             <div class="advanced-title">🔍 Advanced Connection Information</div>
+            
+            <div class="info-row">
+                <span class="label">Test performed at:</span>
+                <span class="value">{{ timestamp }}</span>
+            </div>
             
             <div class="info-row">
                 <span class="label">Name Address:</span>
