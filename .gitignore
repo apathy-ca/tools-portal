@@ -143,3 +143,8 @@ dmypy.json
 # OS generated files
 Thumbs.db
 ehthumbs.db
+
+# Instance-specific nginx configurations
+nginx-tools-ssl.conf
+nginx-tools.conf
+*.conf.bak
