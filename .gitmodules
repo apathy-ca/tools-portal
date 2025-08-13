@@ -1,3 +1,4 @@
 [submodule "tools/dns-by-eye"]
 	path = tools/dns-by-eye
-	url = ../dns_by_eye
+	url = https://github.com/apathy-ca/dns_by_eye.git
+	branch = main
