@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IP Whale! - Your IP Address Information</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='whale_eye_favicon.png') }}">
     <style>
         body {
             font-family: 'Courier New', monospace;
@@ -136,7 +137,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="whale-emoji">🐋</div>
+            <img src="{{ url_for('static', filename='whale_eye_200x200.png') }}" alt="IP Whale Logo" style="width: 120px; height: 120px; margin-bottom: 10px;">
             <h1>IP Whale!</h1>
             <div class="subtitle">This website will tell you your IP[v4|v6] addresses.</div>
         </div>

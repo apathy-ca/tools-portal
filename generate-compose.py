@@ -152,7 +152,7 @@ def generate_nginx_service(detected_tools, ssl=False):
             ],
             'depends_on': depends_on,
             'networks': ['tools-network'],
-            'command': '"/bin/sh -c \'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"\'"',
+            'command': '/bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \'daemon off;\'"',
             'healthcheck': {
                 'test': ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost/health'],
                 'interval': '30s',
