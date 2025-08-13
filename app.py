@@ -8,9 +8,27 @@ from flask import Flask, render_template, send_from_directory, jsonify, request,
 import os
 import json
 import sys
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from config import Config
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.config.from_object(Config)
+
+# Configure logging
+if not app.debug:
+    file_handler = RotatingFileHandler(
+        Config.LOG_FILE,
+        maxBytes=Config.LOG_MAX_BYTES,
+        backupCount=Config.LOG_BACKUP_COUNT,
+        delay=True
+    )
+    file_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
+    file_handler.setLevel(getattr(logging, Config.LOG_LEVEL))
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
+    app.logger.info('Tools Portal startup')
 
 # Tool registry - add new tools here
 TOOLS = {
@@ -78,6 +96,52 @@ def health_check():
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'tools_available': len(TOOLS)
     })
+
+@app.route('/api/health/detailed')
+def detailed_health():
+    """Detailed health check endpoint."""
+    import psutil
+    import requests
+    
+    health_status = {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'version': Config.VERSION,
+        'service': 'tools-portal',
+        'dependencies': {},
+        'metrics': {}
+    }
+    
+    # Check DNS By Eye service
+    try:
+        response = requests.get('http://dns-by-eye:5000/api/health', timeout=5)
+        health_status['dependencies']['dns-by-eye'] = {
+            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
+            'response_time': response.elapsed.total_seconds()
+        }
+    except Exception as e:
+        health_status['dependencies']['dns-by-eye'] = {
+            'status': 'unhealthy',
+            'error': str(e)
+        }
+    
+    # System metrics
+    try:
+        health_status['metrics'] = {
+            'cpu_percent': psutil.cpu_percent(),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_percent': psutil.disk_usage('/').percent
+        }
+    except Exception as e:
+        health_status['metrics']['error'] = str(e)
+    
+    # Determine overall status
+    unhealthy_deps = [dep for dep in health_status['dependencies'].values() 
+                     if dep.get('status') == 'unhealthy']
+    if unhealthy_deps:
+        health_status['status'] = 'degraded'
+    
+    return jsonify(health_status)
 
 @app.route('/dns-by-eye/')
 def dns_by_eye_redirect():
