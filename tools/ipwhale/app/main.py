@@ -117,6 +117,27 @@ def get_client_ip():
     # Fallback to remote_addr
     return request.remote_addr
 
+def get_server_info():
+    """Get server information, avoiding Docker internal IPs."""
+    # Get the actual server hostname/IP that the client connected to
+    server_host = request.headers.get('Host', request.host)
+    
+    # Remove port from host if present
+    if ':' in server_host:
+        server_host = server_host.split(':')[0]
+    
+    # Determine if we're using HTTPS
+    is_secure = request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https'
+    server_port = 443 if is_secure else 80
+    protocol = 'HTTPS' if is_secure else 'HTTP'
+    
+    return {
+        'host': server_host,
+        'port': server_port,
+        'protocol': protocol,
+        'is_secure': is_secure
+    }
+
 def get_client_info():
     """Get comprehensive client information including IP, port, and browser details."""
     client_ip = get_client_ip()
@@ -131,15 +152,19 @@ def get_client_info():
     nat_detected = False
     nat_info = {}
     
+    # Only detect NAT if we have proxy headers AND the IPs are different
     if forwarded_for or real_ip:
-        nat_detected = True
-        nat_info = {
-            'detected': True,
-            'remote_addr': remote_addr,
-            'forwarded_for': forwarded_for,
-            'real_ip': real_ip,
-            'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected'
-        }
+        # Check if the forwarded IP is different from remote_addr
+        forwarded_ip = (forwarded_for.split(',')[0].strip() if forwarded_for else real_ip)
+        if forwarded_ip and forwarded_ip != remote_addr:
+            nat_detected = True
+            nat_info = {
+                'detected': True,
+                'remote_addr': remote_addr,
+                'forwarded_for': forwarded_for,
+                'real_ip': real_ip,
+                'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected'
+            }
     
     return {
         'ip': client_ip,
@@ -240,6 +265,7 @@ def add_security_headers(response):
 def index():
     """Main IPWhale page - shows client IP information like ipquail.com."""
     client_info = get_client_info()
+    server_info = get_server_info()
     client_ip = client_info['ip']
     
     # Determine IP versions
@@ -273,7 +299,8 @@ def index():
                          ipv6_asn=ipv6_asn,
                          remote_port=client_info['remote_port'],
                          user_agent=client_info['user_agent'],
-                         nat_detection=client_info['nat_detection'])
+                         nat_detection=client_info['nat_detection'],
+                         server_info=server_info)
 
 @app.route('/api/ip')
 @handle_errors
@@ -385,6 +412,7 @@ def api_ipv6_asn():
 def api_full():
     """API endpoint to get comprehensive client information (JSON)."""
     client_info = get_client_info()
+    server_info = get_server_info()
     client_ip = client_info['ip']
     
     # Determine IP versions
@@ -415,10 +443,163 @@ def api_full():
         'remote_port': client_info['remote_port'],
         'user_agent': client_info['user_agent'],
         'nat_detection': client_info['nat_detection'],
+        'server_info': server_info,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
     }
     
     return jsonify(result)
+
+@app.route('/api/export/json')
+@handle_errors
+def export_json():
+    """Export comprehensive connection analysis as JSON."""
+    client_info = get_client_info()
+    server_info = get_server_info()
+    client_ip = client_info['ip']
+    
+    # Determine IP versions
+    ipv4_address = None
+    ipv6_address = None
+    
+    ip_version = detect_ip_version(client_ip)
+    if ip_version == 4:
+        ipv4_address = client_ip
+    elif ip_version == 6:
+        ipv6_address = client_ip
+    
+    # Get PTR records
+    ipv4_ptr = lookup_ptr_record(ipv4_address) if ipv4_address else None
+    ipv6_ptr = lookup_ptr_record(ipv6_address) if ipv6_address else None
+    
+    # Get ASN information
+    ipv4_asn = lookup_asn(ipv4_address) if ipv4_address else None
+    ipv6_asn = lookup_asn(ipv6_address) if ipv6_address else None
+    
+    # Build connection chain
+    connection_chain = []
+    
+    # Client node
+    client_node = {
+        'type': 'client',
+        'name': 'Client Device',
+        'ip': client_ip,
+        'port': client_info['remote_port'],
+        'user_agent': client_info['user_agent'],
+        'browser': client_info['user_agent']
+    }
+    connection_chain.append(client_node)
+    
+    # NAT/Proxy node if detected
+    if client_info['nat_detection']['detected']:
+        nat_node = {
+            'type': 'nat_proxy',
+            'name': 'NAT/Proxy',
+            'external_ip': client_info['nat_detection']['remote_addr'],
+            'original_ip': client_info['nat_detection'].get('forwarded_for') or client_info['nat_detection'].get('real_ip'),
+            'explanation': client_info['nat_detection']['explanation']
+        }
+        connection_chain.append(nat_node)
+    
+    # Server node
+    server_node = {
+        'type': 'server',
+        'name': 'IPWhale Server',
+        'host': server_info['host'],
+        'port': server_info['port'],
+        'protocol': server_info['protocol'],
+        'is_secure': server_info['is_secure']
+    }
+    connection_chain.append(server_node)
+    
+    result = {
+        'report_type': 'ipwhale_connection_analysis',
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+        'client_info': {
+            'ipv4_address': ipv4_address,
+            'ipv6_address': ipv6_address,
+            'ipv4_ptr': ipv4_ptr[0] if ipv4_ptr else None,
+            'ipv6_ptr': ipv6_ptr[0] if ipv6_ptr else None,
+            'ipv4_asn': ipv4_asn,
+            'ipv6_asn': ipv6_asn,
+            'remote_port': client_info['remote_port'],
+            'user_agent': client_info['user_agent']
+        },
+        'nat_detection': client_info['nat_detection'],
+        'server_info': server_info,
+        'connection_chain': connection_chain
+    }
+    
+    response = make_response(jsonify(result))
+    response.headers['Content-Disposition'] = f'attachment; filename=ipwhale_report_{int(time.time())}.json'
+    return response
+
+@app.route('/api/export/csv')
+@handle_errors
+def export_csv():
+    """Export connection analysis as CSV."""
+    import csv
+    import io
+    
+    client_info = get_client_info()
+    server_info = get_server_info()
+    client_ip = client_info['ip']
+    
+    # Determine IP versions
+    ipv4_address = None
+    ipv6_address = None
+    
+    ip_version = detect_ip_version(client_ip)
+    if ip_version == 4:
+        ipv4_address = client_ip
+    elif ip_version == 6:
+        ipv6_address = client_ip
+    
+    # Get PTR records
+    ipv4_ptr = lookup_ptr_record(ipv4_address) if ipv4_address else None
+    ipv6_ptr = lookup_ptr_record(ipv6_address) if ipv6_address else None
+    
+    # Get ASN information
+    ipv4_asn = lookup_asn(ipv4_address) if ipv4_address else None
+    ipv6_asn = lookup_asn(ipv6_address) if ipv6_address else None
+    
+    # Create CSV data
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow([
+        'Timestamp', 'Client_IPv4', 'Client_IPv6', 'Client_Port', 'User_Agent',
+        'IPv4_PTR', 'IPv6_PTR', 'IPv4_ASN', 'IPv6_ASN',
+        'NAT_Detected', 'NAT_External_IP', 'NAT_Original_IP',
+        'Server_Host', 'Server_Port', 'Server_Protocol'
+    ])
+    
+    # Write data row
+    writer.writerow([
+        time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+        ipv4_address or '',
+        ipv6_address or '',
+        client_info['remote_port'],
+        client_info['user_agent'],
+        ipv4_ptr[0] if ipv4_ptr else '',
+        ipv6_ptr[0] if ipv6_ptr else '',
+        ipv4_asn or '',
+        ipv6_asn or '',
+        'Yes' if client_info['nat_detection']['detected'] else 'No',
+        client_info['nat_detection'].get('remote_addr', '') if client_info['nat_detection']['detected'] else '',
+        client_info['nat_detection'].get('forwarded_for', '') or client_info['nat_detection'].get('real_ip', '') if client_info['nat_detection']['detected'] else '',
+        server_info['host'],
+        server_info['port'],
+        server_info['protocol']
+    ])
+    
+    csv_content = output.getvalue()
+    output.close()
+    
+    response = make_response(csv_content)
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=ipwhale_report_{int(time.time())}.csv'
+    return response
 
 @app.route('/api/health')
 def health_check():
