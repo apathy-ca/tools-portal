@@ -23,4 +23,4 @@ class Config:
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     
     # Version info
-    VERSION = '1.0.0'
+    VERSION = '1.1.0'

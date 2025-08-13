@@ -35,7 +35,7 @@ TOOLS = {
     'dns-by-eye': {
         'name': 'DNS By Eye',
         'description': 'DNS delegation visualizer with health scoring and glue record analysis',
-        'version': '1.0.2',
+        'version': '1.3.0',
         'url': '/dns-by-eye/',
         'icon': '🔍',
         'category': 'DNS & Networking',
