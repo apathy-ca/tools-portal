@@ -163,14 +163,19 @@ def get_client_info():
     nat_info = {}
     
     # Only detect NAT if we have proxy headers AND the IPs are different
+    # Also avoid showing Docker internal IPs (172.x.x.x, 10.x.x.x, 192.168.x.x)
     if forwarded_for or real_ip:
-        # Check if the forwarded IP is different from remote_addr
         forwarded_ip = (forwarded_for.split(',')[0].strip() if forwarded_for else real_ip)
         if forwarded_ip and forwarded_ip != remote_addr:
+            # Check if remote_addr is a private/Docker IP that we shouldn't expose
+            is_docker_ip = (remote_addr.startswith('172.') or 
+                           remote_addr.startswith('10.') or 
+                           remote_addr.startswith('192.168.'))
+            
             nat_detected = True
             nat_info = {
                 'detected': True,
-                'remote_addr': remote_addr,
+                'remote_addr': 'Unknown' if is_docker_ip else remote_addr,
                 'forwarded_for': forwarded_for,
                 'real_ip': real_ip,
                 'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected'
