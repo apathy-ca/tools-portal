@@ -131,8 +131,18 @@ def get_server_info():
     server_port = 443 if is_secure else 80
     protocol = 'HTTPS' if is_secure else 'HTTP'
     
+    # Try to resolve server IP
+    server_ip = None
+    try:
+        import socket
+        server_ip = socket.gethostbyname(server_host)
+    except Exception as e:
+        app.logger.debug(f"Could not resolve server IP for {server_host}: {str(e)}")
+        server_ip = server_host  # Fallback to hostname
+    
     return {
         'host': server_host,
+        'ip': server_ip,
         'port': server_port,
         'protocol': protocol,
         'is_secure': is_secure
@@ -465,6 +475,10 @@ def api_full():
     ipv4_asn = lookup_asn(ipv4_address) if ipv4_address else None
     ipv6_asn = lookup_asn(ipv6_address) if ipv6_address else None
     
+    # Get ASN names
+    ipv4_asn_name = lookup_asn_name(ipv4_asn) if ipv4_asn else None
+    ipv6_asn_name = lookup_asn_name(ipv6_asn) if ipv6_asn else None
+    
     result = {
         'ipv4_address': ipv4_address,
         'ipv6_address': ipv6_address,
@@ -472,6 +486,8 @@ def api_full():
         'ipv6_ptr': ipv6_ptr[0] if ipv6_ptr else None,
         'ipv4_asn': ipv4_asn,
         'ipv6_asn': ipv6_asn,
+        'ipv4_asn_name': ipv4_asn_name,
+        'ipv6_asn_name': ipv6_asn_name,
         'remote_port': client_info['remote_port'],
         'user_agent': client_info['user_agent'],
         'nat_detection': client_info['nat_detection'],
@@ -480,6 +496,12 @@ def api_full():
     }
     
     return jsonify(result)
+
+@app.route('/api/report')
+@handle_errors
+def api_report():
+    """Full report endpoint - returns the same data as the web page in JSON format."""
+    return api_full()
 
 @app.route('/api/export/json')
 @handle_errors

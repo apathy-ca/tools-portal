@@ -415,15 +415,13 @@
                     </div>
                     <div class="node-details">
                         <div class="detail-row">
-                            <span class="detail-label">External IP:</span>
+                            <span class="detail-label">Remote Public IP:</span>
+                            <span class="detail-value">{{ nat_detection.forwarded_for or nat_detection.real_ip or nat_detection.remote_addr }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">NAT Internal IP:</span>
                             <span class="detail-value">{{ nat_detection.remote_addr }}</span>
                         </div>
-                        {% if nat_detection.forwarded_for %}
-                        <div class="detail-row">
-                            <span class="detail-label">Original IP:</span>
-                            <span class="detail-value">{{ nat_detection.forwarded_for }}</span>
-                        </div>
-                        {% endif %}
                         <div class="detail-row">
                             <span class="detail-label">Type:</span>
                             <span class="detail-value">{{ nat_detection.explanation }}</span>
@@ -448,6 +446,10 @@
                         <div class="detail-row">
                             <span class="detail-label">Server Host:</span>
                             <span class="detail-value">{{ server_info.host }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Server IP:</span>
+                            <span class="detail-value">{{ server_info.ip }}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Server Port:</span>
@@ -480,6 +482,7 @@
             <div class="curl-command">PTR4=`curl -s {{ request.host }}/api/4/ptr`</div>
             <div class="curl-command">ASN6=`curl -s {{ request.host }}/api/6/asn`</div>
             <div class="curl-command">ASN4=`curl -s {{ request.host }}/api/4/asn`</div>
+            <div class="curl-command">REPORT=`curl -s {{ request.host }}/api/report`</div>
         </div>
 
         <div class="export-section">
