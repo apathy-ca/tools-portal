@@ -12,6 +12,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from config import Config
+from dynamic_tools import detect_available_tools, get_tool_categories, check_tool_health
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
@@ -28,67 +29,14 @@ if not app.debug:
     file_handler.setLevel(getattr(logging, Config.LOG_LEVEL))
     app.logger.addHandler(file_handler)
     app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
-    app.logger.info('Tools Portal startup')
+    app.logger.info('Tools Portal startup - Dynamic tool detection enabled')
 
-# Tool registry - add new tools here
-TOOLS = {
-    'dns-by-eye': {
-        'name': 'DNS By Eye',
-        'description': 'DNS delegation visualizer with health scoring and glue record analysis',
-        'version': '1.3.0',
-        'url': '/dns-by-eye/',
-        'icon': '🔍',
-        'category': 'DNS & Networking',
-        'status': 'stable',
-        'features': [
-            'DNS delegation tracing',
-            'Visual graph generation',
-            'Health score calculation',
-            'Glue record validation',
-            'Multi-domain comparison',
-            'Export capabilities'
-        ],
-        'tags': ['dns', 'networking', 'visualization', 'debugging']
-    },
-    'ipwhale': {
-        'name': 'IP Whale',
-        'description': 'IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection',
-        'version': '1.0.0',
-        'url': '/ipwhale/',
-        'icon': '🐋',
-        'category': 'DNS & Networking',
-        'status': 'stable',
-        'features': [
-            'IPv4 and IPv6 detection',
-            'PTR record lookup',
-            'ASN information',
-            'NAT detection',
-            'Remote port detection',
-            'Curl-friendly API endpoints'
-        ],
-        'tags': ['ip', 'networking', 'asn', 'ptr', 'nat-detection']
-    }
-    # Future tools will be added here
-}
+# Dynamic tool detection - automatically discovers tools from submodules
+print("🔍 Detecting available tools...")
+TOOLS = detect_available_tools()
+CATEGORIES = get_tool_categories(TOOLS)
 
-CATEGORIES = {
-    'DNS & Networking': {
-        'icon': '🌐',
-        'description': 'Tools for DNS analysis, network diagnostics, and connectivity testing'
-    },
-    'Security': {
-        'icon': '🔒',
-        'description': 'Security analysis, vulnerability scanning, and penetration testing tools'
-    },
-    'System Administration': {
-        'icon': '⚙️',
-        'description': 'Server management, monitoring, and system diagnostic utilities'
-    },
-    'Development': {
-        'icon': '💻',
-        'description': 'Developer tools, code analysis, and debugging utilities'
-    }
-}
+print(f"✅ Detected {len(TOOLS)} tools: {', '.join(TOOLS.keys())}")
 
 @app.route('/')
 def index():
@@ -117,9 +65,8 @@ def health_check():
 
 @app.route('/api/health/detailed')
 def detailed_health():
-    """Detailed health check endpoint."""
+    """Detailed health check endpoint with dynamic tool detection."""
     import psutil
-    import requests
     
     health_status = {
         'status': 'healthy',
@@ -127,34 +74,13 @@ def detailed_health():
         'version': Config.VERSION,
         'service': 'tools-portal',
         'dependencies': {},
-        'metrics': {}
+        'metrics': {},
+        'detected_tools': list(TOOLS.keys())
     }
     
-    # Check DNS By Eye service
-    try:
-        response = requests.get('http://dns-by-eye:5000/api/health', timeout=5)
-        health_status['dependencies']['dns-by-eye'] = {
-            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
-            'response_time': response.elapsed.total_seconds()
-        }
-    except Exception as e:
-        health_status['dependencies']['dns-by-eye'] = {
-            'status': 'unhealthy',
-            'error': str(e)
-        }
-    
-    # Check IP Whale service
-    try:
-        response = requests.get('http://ipwhale:5000/api/health', timeout=5)
-        health_status['dependencies']['ipwhale'] = {
-            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
-            'response_time': response.elapsed.total_seconds()
-        }
-    except Exception as e:
-        health_status['dependencies']['ipwhale'] = {
-            'status': 'unhealthy',
-            'error': str(e)
-        }
+    # Dynamically check all detected tools
+    for tool_name in TOOLS.keys():
+        health_status['dependencies'][tool_name] = check_tool_health(tool_name)
     
     # System metrics
     try:

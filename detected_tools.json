@@ -1,0 +1,53 @@
+{
+  "detected_at": "C:\\Users\\T947564\\Source\\repos\\tools\\tools-portal",
+  "tool_count": 2,
+  "tools": {
+    "dns-by-eye": {
+      "name": "DNS By Eye",
+      "description": "DNS delegation visualizer with health scoring and glue record analysis",
+      "version": "1.3.0",
+      "url": "/dns-by-eye/",
+      "icon": "\ud83d\udd0d",
+      "category": "DNS & Networking",
+      "status": "stable",
+      "features": [
+        "DNS delegation tracing",
+        "Visual graph generation",
+        "Health score calculation",
+        "Glue record validation",
+        "Multi-domain comparison",
+        "Export capabilities"
+      ],
+      "tags": [
+        "dns",
+        "networking",
+        "visualization",
+        "debugging"
+      ]
+    },
+    "ipwhale": {
+      "name": "IP Whale",
+      "description": "IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection",
+      "version": "1.0.0",
+      "url": "/ipwhale/",
+      "icon": "\ud83d\udc0b",
+      "category": "DNS & Networking",
+      "status": "stable",
+      "features": [
+        "IPv4 and IPv6 detection",
+        "PTR record lookup",
+        "ASN information",
+        "NAT detection",
+        "Remote port detection",
+        "Curl-friendly API endpoints"
+      ],
+      "tags": [
+        "ip",
+        "networking",
+        "asn",
+        "ptr",
+        "nat-detection"
+      ]
+    }
+  }
+}
