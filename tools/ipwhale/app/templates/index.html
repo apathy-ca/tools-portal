@@ -115,6 +115,91 @@
             background-color: #f8d7da;
             border: 1px solid #f5c6cb;
         }
+        
+        /* Connection Chain Styles */
+        .connection-chain {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .chain-title {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+        .chain-node {
+            background-color: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .client-node {
+            border-color: #28a745;
+        }
+        .nat-node {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .server-node {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        .node-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .node-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        .node-title {
+            color: #495057;
+            font-size: 1.1em;
+        }
+        .node-details {
+            margin-left: 35px;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #6c757d;
+            min-width: 120px;
+        }
+        .detail-value {
+            color: #495057;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            flex: 1;
+            text-align: right;
+        }
+        .chain-arrow {
+            text-align: center;
+            margin: 15px 0;
+            color: #6c757d;
+        }
+        .arrow-text {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .arrow {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -130,6 +215,19 @@
             .label {
                 min-width: auto;
                 margin-bottom: 5px;
+            }
+            .detail-row {
+                flex-direction: column;
+            }
+            .detail-label {
+                min-width: auto;
+                margin-bottom: 3px;
+            }
+            .detail-value {
+                text-align: left;
+            }
+            .node-details {
+                margin-left: 0;
             }
         }
     </style>
@@ -186,18 +284,8 @@
             </div>
         </div>
 
-        <div class="curl-section">
-            <div class="curl-title">This website can also be shell scripted using curl:</div>
-            <div class="curl-command">IP6=`curl -s {{ request.host }}/api/6/ip`</div>
-            <div class="curl-command">IP4=`curl -s {{ request.host }}/api/4/ip`</div>
-            <div class="curl-command">PTR6=`curl -s {{ request.host }}/api/6/ptr`</div>
-            <div class="curl-command">PTR4=`curl -s {{ request.host }}/api/4/ptr`</div>
-            <div class="curl-command">ASN6=`curl -s {{ request.host }}/api/6/asn`</div>
-            <div class="curl-command">ASN4=`curl -s {{ request.host }}/api/4/asn`</div>
-        </div>
-
         <div class="advanced-section">
-            <div class="advanced-title">🔍 Advanced Information (IPChicken-style)</div>
+            <div class="advanced-title">🔍 Advanced Connection Information</div>
             
             <div class="info-row">
                 <span class="label">Name Address:</span>
@@ -214,25 +302,108 @@
                 <span class="value">{{ user_agent }}</span>
             </div>
 
+            <!-- Connection Chain Diagram -->
+            <div class="connection-chain">
+                <div class="chain-title">🔗 Connection Chain Analysis</div>
+                
+                <!-- Client Side -->
+                <div class="chain-node client-node">
+                    <div class="node-header">
+                        <span class="node-icon">💻</span>
+                        <span class="node-title">Your Device</span>
+                    </div>
+                    <div class="node-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Browser:</span>
+                            <span class="detail-value">{{ user_agent }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Client Port:</span>
+                            <span class="detail-value">{{ remote_port }} (ephemeral)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arrow -->
+                <div class="chain-arrow">
+                    <span class="arrow-text">connects to</span>
+                    <div class="arrow">→</div>
+                </div>
+
+                {% if nat_detection.detected %}
+                <!-- NAT/Proxy Node -->
+                <div class="chain-node nat-node">
+                    <div class="node-header">
+                        <span class="node-icon">🔄</span>
+                        <span class="node-title">NAT/Proxy</span>
+                    </div>
+                    <div class="node-details">
+                        <div class="detail-row">
+                            <span class="detail-label">External IP:</span>
+                            <span class="detail-value">{{ nat_detection.remote_addr }}</span>
+                        </div>
+                        {% if nat_detection.forwarded_for %}
+                        <div class="detail-row">
+                            <span class="detail-label">Original IP:</span>
+                            <span class="detail-value">{{ nat_detection.forwarded_for }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="detail-row">
+                            <span class="detail-label">Type:</span>
+                            <span class="detail-value">{{ nat_detection.explanation }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arrow -->
+                <div class="chain-arrow">
+                    <span class="arrow-text">forwards to</span>
+                    <div class="arrow">→</div>
+                </div>
+                {% endif %}
+
+                <!-- IPWhale Server -->
+                <div class="chain-node server-node">
+                    <div class="node-header">
+                        <span class="node-icon">🐋</span>
+                        <span class="node-title">IPWhale Server</span>
+                    </div>
+                    <div class="node-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Server IP:</span>
+                            <span class="detail-value">{{ request.host }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Server Port:</span>
+                            <span class="detail-value">{{ '443 (HTTPS)' if request.is_secure else '80 (HTTP)' }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Protocol:</span>
+                            <span class="detail-value">{{ request.scheme.upper() }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {% if nat_detection.detected %}
             <div class="nat-info nat-detected">
-                <strong>🚨 NAT/Proxy Detection:</strong><br>
-                {{ nat_detection.explanation }}<br>
-                <small>
-                    <strong>Direct connection:</strong> {{ nat_detection.remote_addr }}<br>
-                    {% if nat_detection.forwarded_for %}
-                    <strong>X-Forwarded-For:</strong> {{ nat_detection.forwarded_for }}<br>
-                    {% endif %}
-                    {% if nat_detection.real_ip %}
-                    <strong>X-Real-IP:</strong> {{ nat_detection.real_ip }}<br>
-                    {% endif %}
-                </small>
+                <strong>🚨 NAT/Proxy Detected:</strong> Your connection is being routed through network address translation or a proxy server.
             </div>
             {% else %}
             <div class="nat-info">
-                <strong>✅ Direct Connection:</strong> No NAT/proxy detected - you appear to be connecting directly.
+                <strong>✅ Direct Connection:</strong> You appear to be connecting directly without NAT or proxy.
             </div>
             {% endif %}
+        </div>
+
+        <div class="curl-section">
+            <div class="curl-title">This website can also be shell scripted using curl:</div>
+            <div class="curl-command">IP6=`curl -s {{ request.host }}/api/6/ip`</div>
+            <div class="curl-command">IP4=`curl -s {{ request.host }}/api/4/ip`</div>
+            <div class="curl-command">PTR6=`curl -s {{ request.host }}/api/6/ptr`</div>
+            <div class="curl-command">PTR4=`curl -s {{ request.host }}/api/4/ptr`</div>
+            <div class="curl-command">ASN6=`curl -s {{ request.host }}/api/6/asn`</div>
+            <div class="curl-command">ASN4=`curl -s {{ request.host }}/api/4/asn`</div>
         </div>
 
         <div class="footer">

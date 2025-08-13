@@ -248,7 +248,6 @@ def generate_compose_file(ssl=False):
     
     # Start with base configuration
     compose = {
-        'version': '3.8',
         'services': generate_base_services()
     }
     
