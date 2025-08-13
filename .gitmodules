@@ -2,3 +2,7 @@
 	path = tools/dns-by-eye
 	url = https://github.com/apathy-ca/dns_by_eye.git
 	branch = main
+[submodule "tools/ipwhale"]
+	path = tools/ipwhale
+	url = https://github.com/apathy-ca/ipwhale.git
+	branch = main

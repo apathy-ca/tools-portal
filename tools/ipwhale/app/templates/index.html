@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Whale! - Your IP Address Information</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .whale-emoji {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+        .info-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px dotted #bdc3c7;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 200px;
+        }
+        .value {
+            color: #27ae60;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+        .none-value {
+            color: #e74c3c;
+            font-style: italic;
+        }
+        .curl-section {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .curl-title {
+            color: #3498db;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .curl-command {
+            background-color: #34495e;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .advanced-section {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .advanced-title {
+            color: #856404;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .nat-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .nat-detected {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        @media (max-width: 600px) {
+            .info-row {
+                flex-direction: column;
+            }
+            .label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="whale-emoji">🐋</div>
+            <h1>IP Whale!</h1>
+            <div class="subtitle">This website will tell you your IP[v4|v6] addresses.</div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-row">
+                <span class="label">Your IPv6 address is:</span>
+                <span class="value {{ 'none-value' if not ipv6_address }}">
+                    {{ ipv6_address or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv4 address is:</span>
+                <span class="value {{ 'none-value' if not ipv4_address }}">
+                    {{ ipv4_address or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv6 PTR is:</span>
+                <span class="value {{ 'none-value' if not ipv6_ptr }}">
+                    {{ ipv6_ptr or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv4 PTR is:</span>
+                <span class="value {{ 'none-value' if not ipv4_ptr }}">
+                    {{ ipv4_ptr or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv6 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv6_asn }}">
+                    {{ ipv6_asn or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv4 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv4_asn }}">
+                    {{ ipv4_asn or 'None' }}
+                </span>
+            </div>
+        </div>
+
+        <div class="curl-section">
+            <div class="curl-title">This website can also be shell scripted using curl:</div>
+            <div class="curl-command">IP6=`curl -s {{ request.host }}/api/6/ip`</div>
+            <div class="curl-command">IP4=`curl -s {{ request.host }}/api/4/ip`</div>
+            <div class="curl-command">PTR6=`curl -s {{ request.host }}/api/6/ptr`</div>
+            <div class="curl-command">PTR4=`curl -s {{ request.host }}/api/4/ptr`</div>
+            <div class="curl-command">ASN6=`curl -s {{ request.host }}/api/6/asn`</div>
+            <div class="curl-command">ASN4=`curl -s {{ request.host }}/api/4/asn`</div>
+        </div>
+
+        <div class="advanced-section">
+            <div class="advanced-title">🔍 Advanced Information (IPChicken-style)</div>
+            
+            <div class="info-row">
+                <span class="label">Name Address:</span>
+                <span class="value">{{ ipv4_ptr or ipv6_ptr or 'Unknown' }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Remote Port:</span>
+                <span class="value">{{ remote_port }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Browser:</span>
+                <span class="value">{{ user_agent }}</span>
+            </div>
+
+            {% if nat_detection.detected %}
+            <div class="nat-info nat-detected">
+                <strong>🚨 NAT/Proxy Detection:</strong><br>
+                {{ nat_detection.explanation }}<br>
+                <small>
+                    <strong>Direct connection:</strong> {{ nat_detection.remote_addr }}<br>
+                    {% if nat_detection.forwarded_for %}
+                    <strong>X-Forwarded-For:</strong> {{ nat_detection.forwarded_for }}<br>
+                    {% endif %}
+                    {% if nat_detection.real_ip %}
+                    <strong>X-Real-IP:</strong> {{ nat_detection.real_ip }}<br>
+                    {% endif %}
+                </small>
+            </div>
+            {% else %}
+            <div class="nat-info">
+                <strong>✅ Direct Connection:</strong> No NAT/proxy detected - you appear to be connecting directly.
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <p>IPWhale v1.0.0 - Inspired by IPQuail and IPChicken</p>
+            <p>Built with ❤️ for the tools-portal framework</p>
+        </div>
+    </div>
+</body>
+</html>
