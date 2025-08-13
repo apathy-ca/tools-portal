@@ -49,6 +49,24 @@ TOOLS = {
             'Export capabilities'
         ],
         'tags': ['dns', 'networking', 'visualization', 'debugging']
+    },
+    'ipwhale': {
+        'name': 'IP Whale',
+        'description': 'IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection',
+        'version': '1.0.0',
+        'url': '/ipwhale/',
+        'icon': '🐋',
+        'category': 'DNS & Networking',
+        'status': 'stable',
+        'features': [
+            'IPv4 and IPv6 detection',
+            'PTR record lookup',
+            'ASN information',
+            'NAT detection',
+            'Remote port detection',
+            'Curl-friendly API endpoints'
+        ],
+        'tags': ['ip', 'networking', 'asn', 'ptr', 'nat-detection']
     }
     # Future tools will be added here
 }
@@ -125,6 +143,19 @@ def detailed_health():
             'error': str(e)
         }
     
+    # Check IP Whale service
+    try:
+        response = requests.get('http://ipwhale:5000/api/health', timeout=5)
+        health_status['dependencies']['ipwhale'] = {
+            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
+            'response_time': response.elapsed.total_seconds()
+        }
+    except Exception as e:
+        health_status['dependencies']['ipwhale'] = {
+            'status': 'unhealthy',
+            'error': str(e)
+        }
+    
     # System metrics
     try:
         health_status['metrics'] = {
@@ -151,6 +182,16 @@ def dns_by_eye_redirect():
 @app.route('/dns-by-eye/<path:path>')
 def dns_by_eye_subpaths(path):
     """Handle DNS By Eye subpaths - this will be handled by nginx proxy."""
+    return redirect('/')
+
+@app.route('/ipwhale/')
+def ipwhale_redirect():
+    """Redirect to IP Whale tool - this will be handled by nginx proxy."""
+    return redirect('/')
+
+@app.route('/ipwhale/<path:path>')
+def ipwhale_subpaths(path):
+    """Handle IP Whale subpaths - this will be handled by nginx proxy."""
     return redirect('/')
 
 @app.route('/static/<path:filename>')

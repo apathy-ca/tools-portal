@@ -40,6 +40,24 @@ services:
       timeout: 10s
       retries: 3
 
+  # IP Whale tool
+  ipwhale:
+    build:
+      context: ./tools/ipwhale
+      dockerfile: Dockerfile
+    container_name: ipwhale
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - STATIC_URL_PATH=/ipwhale/static
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Nginx reverse proxy
   nginx:
     image: nginx:alpine
@@ -52,6 +70,7 @@ services:
     depends_on:
       - tools-portal
       - dns-by-eye
+      - ipwhale
     networks:
       - tools-network
     healthcheck:
