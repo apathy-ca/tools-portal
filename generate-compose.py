@@ -284,6 +284,199 @@ def generate_compose_file(ssl=False):
     
     return compose
 
+def generate_nginx_config(detected_tools, ssl=False, domain="localhost"):
+    """Generate nginx configuration file."""
+    
+    # Base nginx config
+    config = f"""events {{
+    worker_connections 1024;
+}}
+
+http {{
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    # Logging
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/error.log warn;
+
+    # Basic settings
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
+
+    # Upstream servers
+    upstream tools-portal {{
+        server tools-portal:5000;
+    }}
+"""
+
+    # Add upstream blocks for detected tools
+    for tool in detected_tools:
+        config += f"""
+    upstream {tool} {{
+        server {tool}:5000;
+    }}
+"""
+
+    if ssl:
+        # HTTP to HTTPS redirect
+        config += f"""
+    # HTTP to HTTPS redirect
+    server {{
+        listen 80;
+        server_name {domain};
+        
+        # Let's Encrypt challenge
+        location /.well-known/acme-challenge/ {{
+            root /var/www/certbot;
+        }}
+
+        # Redirect all other traffic to HTTPS
+        location / {{
+            return 301 https://$server_name$request_uri;
+        }}
+    }}
+
+    # HTTPS server
+    server {{
+        listen 443 ssl http2;
+        server_name {domain};
+
+        # SSL configuration
+        ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/{domain}/privkey.pem;
+        
+        # SSL security settings
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+"""
+    else:
+        # HTTP only server
+        config += f"""
+    # HTTP server
+    server {{
+        listen 80;
+        server_name {domain};
+"""
+
+    # Main tools portal location
+    config += """
+        # Main tools portal
+        location / {
+            limit_req zone=general burst=20 nodelay;
+            proxy_pass http://tools-portal;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+"""
+
+    # Add location blocks for detected tools
+    for tool in detected_tools:
+        config += f"""
+        # {tool.replace('-', ' ').title()} tool
+        location /{tool}/ {{
+            limit_req zone=general burst=20 nodelay;
+            proxy_pass http://{tool}/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }}
+"""
+
+    # Common location blocks
+    config += """
+        # API endpoints with rate limiting
+        location /api/ {
+            limit_req zone=api burst=5 nodelay;
+            proxy_pass http://tools-portal;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port $server_port;
+        }
+
+        # Health check endpoint
+        location /health {
+            proxy_pass http://tools-portal;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            access_log off;
+        }
+
+        # Static files for tools portal
+        location /static/ {
+            proxy_pass http://tools-portal;
+            proxy_set_header Host $host;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+"""
+
+    if ssl:
+        config += """
+        # Let's Encrypt challenge
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+"""
+
+    config += """    }
+}
+"""
+
+    return config
+
 def main():
     """Main function."""
     print("🐋 Tools Portal - Dynamic Docker Compose Generator")
@@ -294,26 +487,38 @@ def main():
         print("❌ Error: Please run this script from the tools-portal directory")
         sys.exit(1)
     
+    detected_tools = detect_tools()
+    
     # Generate both configurations
     for ssl in [False, True]:
         suffix = '-ssl' if ssl else ''
-        filename = f'docker-compose-tools{suffix}.yaml'
+        compose_filename = f'docker-compose-tools{suffix}.yaml'
+        nginx_filename = f'nginx-tools{suffix}.conf'
         
+        # Generate docker-compose file
         compose_config = generate_compose_file(ssl)
-        
-        # Write the file
-        with open(filename, 'w') as f:
+        with open(compose_filename, 'w') as f:
             yaml.dump(compose_config, f, default_flow_style=False, sort_keys=False)
+        print(f"✅ Generated {compose_filename}")
         
-        print(f"✅ Generated {filename}")
+        # Generate nginx config file
+        # Use a default domain - this should be updated by deployment scripts
+        default_domain = "localhost" if not ssl else "your-domain.com"
+        nginx_config = generate_nginx_config(detected_tools, ssl, default_domain)
+        with open(nginx_filename, 'w') as f:
+            f.write(nginx_config)
+        print(f"✅ Generated {nginx_filename}")
     
-    print("\n🎉 Docker Compose files generated successfully!")
+    print("\n🎉 Docker Compose and Nginx files generated successfully!")
     print("\n📋 Usage:")
     print("   Standard:  docker-compose -f docker-compose-tools.yaml up --build")
     print("   With SSL:  docker-compose -f docker-compose-tools-ssl.yaml up --build")
+    print("\n⚠️  Important:")
+    print("   - Update nginx-tools-ssl.conf with your actual domain name")
+    print("   - Ensure SSL certificates are properly configured")
     print("\n💡 To add/remove tools:")
     print("   1. Add/remove git submodules in tools/ directory")
-    print("   2. Run this script to regenerate compose files")
+    print("   2. Run this script to regenerate compose and nginx files")
     print("   3. Restart with docker-compose")
 
 if __name__ == '__main__':

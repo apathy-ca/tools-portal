@@ -113,18 +113,36 @@ export COMPOSE_DOCKER_CLI_BUILD=0
 echo -e "${BLUE}Updating submodules to latest commits...${NC}"
 git submodule update --remote --force 2>/dev/null || git submodule update --init --recursive
 
-# Check if nginx configuration exists and update domain
-echo -e "${BLUE}Updating nginx configuration for domain: $DOMAIN${NC}"
-if [ ! -f "nginx-tools-ssl.conf" ]; then
-    echo -e "${RED}Error: nginx-tools-ssl.conf not found!${NC}"
-    echo "Please ensure you're running this script from the tools-portal directory."
-    exit 1
+# Generate nginx configuration with proper domain
+echo -e "${BLUE}Generating nginx configuration for domain: $DOMAIN${NC}"
+if [ -f "generate-compose.py" ]; then
+    echo -e "${BLUE}Regenerating configuration files with detected tools...${NC}"
+    python3 generate-compose.py 2>/dev/null || python generate-compose.py 2>/dev/null || {
+        echo -e "${YELLOW}Warning: Could not run generate-compose.py, using existing files${NC}"
+    }
+    
+    # Update domain in the generated nginx config
+    if [ -f "nginx-tools-ssl.conf" ]; then
+        sed -i.bak "s/server_name [^;]*/server_name $DOMAIN/g" nginx-tools-ssl.conf
+        sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/$DOMAIN/|g" nginx-tools-ssl.conf
+        echo -e "${GREEN}✓ Updated nginx configuration with domain: $DOMAIN${NC}"
+    else
+        echo -e "${RED}Error: nginx-tools-ssl.conf not found after generation!${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}Warning: generate-compose.py not found, checking for existing nginx config...${NC}"
+    if [ ! -f "nginx-tools-ssl.conf" ]; then
+        echo -e "${RED}Error: nginx-tools-ssl.conf not found!${NC}"
+        echo "Please ensure you're running this script from the tools-portal directory."
+        exit 1
+    fi
+    
+    # Update the domain in the existing nginx configuration
+    sed -i.bak "s/server_name [^;]*/server_name $DOMAIN/g" nginx-tools-ssl.conf
+    sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/$DOMAIN/|g" nginx-tools-ssl.conf
+    echo -e "${GREEN}✓ Updated nginx configuration with domain: $DOMAIN${NC}"
 fi
-
-# Update the domain in the nginx configuration
-sed -i.bak "s/server_name [^;]*/server_name $DOMAIN/g" nginx-tools-ssl.conf
-sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/$DOMAIN/|g" nginx-tools-ssl.conf
-echo -e "${GREEN}✓ Updated nginx configuration with domain: $DOMAIN${NC}"
 
 # Generate SSL certificate
 echo -e "${BLUE}Generating SSL certificate...${NC}"
@@ -256,8 +274,9 @@ echo -e "${GREEN}SSL setup complete!${NC}"
 echo ""
 echo "Your Tools Portal instance is now available at:"
 echo -e "${GREEN}https://$DOMAIN${NC}"
-echo "DNS By Eye is available at:"
-echo -e "${GREEN}https://$DOMAIN/dns-by-eye/${NC}"
+echo "Available tools:"
+echo -e "${GREEN}https://$DOMAIN/dns-by-eye/${NC} - DNS By Eye"
+echo -e "${GREEN}https://$DOMAIN/ipwhale/${NC} - IP Whale"
 echo ""
 echo "Management commands:"
 echo "  View logs:      docker compose -f docker-compose-tools-ssl.yaml logs -f"
