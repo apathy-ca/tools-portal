@@ -241,44 +241,50 @@
         </header>
         
         <main class="tools-list">
-            <div class="tool" onclick="window.open('/dns-by-eye/', '_blank')">
+            {% for tool_id, tool in tools.items() %}
+            <div class="tool" onclick="window.open('{{ tool.url }}', '_blank')">
                 <div class="tool-logo">
-                    <img src="/dns-by-eye/static/dns_by_eye_200x200.png" alt="DNS By Eye Logo">
+                    {% if tool_id == 'dns-by-eye' %}
+                        <img src="/dns-by-eye/static/dns_by_eye_200x200.png" alt="{{ tool.name }} Logo">
+                    {% elif tool_id == 'ipwhale' %}
+                        <img src="/ipwhale/static/whale_eye_200x200.png" alt="{{ tool.name }} Logo">
+                    {% else %}
+                        <div style="font-size: 2rem;">{{ tool.icon }}</div>
+                    {% endif %}
                 </div>
                 <div class="tool-content">
                     <div class="tool-header">
-                        <h2 class="tool-name">DNS By Eye</h2>
-                        <span class="tool-version">v1.0.2</span>
-                        <span class="tool-status">Stable</span>
+                        <h2 class="tool-name">{{ tool.name }}</h2>
+                        <span class="tool-version">v{{ tool.version }}</span>
+                        <span class="tool-status">{{ tool.status|title }}</span>
                     </div>
                     <p class="tool-description">
-                        Comprehensive DNS delegation analysis tool with visual graphs, health scoring, and glue record validation. 
-                        Trace DNS delegation chains from root servers to authoritative nameservers with detailed reporting.
+                        {{ tool.description }}
                     </p>
                     <div class="tool-features">
-                        <span class="feature-tag">DNS Delegation Tracing</span>
-                        <span class="feature-tag">Visual Graphs</span>
-                        <span class="feature-tag">Health Scoring</span>
-                        <span class="feature-tag">Glue Record Analysis</span>
-                        <span class="feature-tag">Cross-Reference Validation</span>
-                        <span class="feature-tag">Export (JSON/CSV)</span>
-                        <span class="feature-tag">REST API</span>
-                        <span class="feature-tag">Multiple DNS Servers</span>
+                        {% for feature in tool.features %}
+                        <span class="feature-tag">{{ feature }}</span>
+                        {% endfor %}
                     </div>
                     <div class="tool-actions">
-                        <a href="/dns-by-eye/" class="btn btn-primary" onclick="event.stopPropagation();">Launch Tool</a>
+                        <a href="{{ tool.url }}" class="btn btn-primary" onclick="event.stopPropagation();">Launch Tool</a>
+                        {% if tool_id == 'dns-by-eye' %}
                         <a href="https://github.com/apathy-ca/dns_by_eye" target="_blank" class="btn btn-secondary" onclick="event.stopPropagation();">View Source</a>
+                        {% elif tool_id == 'ipwhale' %}
+                        <a href="https://github.com/apathy-ca/ipwhale" target="_blank" class="btn btn-secondary" onclick="event.stopPropagation();">View Source</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+            {% endfor %}
         </main>
         
         <footer class="footer">
             <p>
                 <strong>Tools Portal</strong> - Professional network administration tools<br>
                 Built with ❤️ using Flask | 
-                <a href="https://github.com/apathy-ca/dns_by_eye" target="_blank">📂 GitHub Repository</a> | 
-                <a href="/dns-by-eye/api/health" target="_blank">🔌 API Health</a>
+                <a href="https://github.com/apathy-ca/tools-portal" target="_blank">📂 GitHub Repository</a> | 
+                <a href="/api/health/detailed" target="_blank">🔌 API Health</a>
             </p>
             <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
                 Created with ChatGPT, Cline & Anthropic (Claude Sonnet)
@@ -297,7 +303,8 @@
         // Tool click analytics
         document.querySelectorAll('.tool').forEach(tool => {
             tool.addEventListener('click', function() {
-                console.log('DNS By Eye tool accessed');
+                const toolName = tool.querySelector('.tool-name').textContent;
+                console.log(`${toolName} tool accessed`);
             });
         });
     </script>
