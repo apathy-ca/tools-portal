@@ -434,13 +434,13 @@
             </div>
             
             <div class="info-row">
-                <span class="label">Remote Port:</span>
-                <span class="value">{{ remote_port }}</span>
+                <span class="label">Client Browser Port:</span>
+                <span class="value">{{ remote_port }} (ephemeral)</span>
             </div>
             
             {% if nat_detection.detected and nat_detection.client_public_port %}
             <div class="info-row">
-                <span class="label">Public Port:</span>
+                <span class="label">NAT Public Port:</span>
                 <span class="value">{{ nat_detection.client_public_port }}</span>
             </div>
             {% endif %}

@@ -283,8 +283,51 @@ def generate_compose_file(ssl=False):
     
     return compose
 
+def detect_ssl_domain():
+    """Detect existing SSL domain from nginx config or certificates."""
+    # Check if nginx config exists and extract domain
+    if os.path.exists('nginx-tools-ssl.conf'):
+        try:
+            with open('nginx-tools-ssl.conf', 'r') as f:
+                content = f.read()
+                # Look for server_name directive
+                import re
+                match = re.search(r'server_name\s+([^;]+);', content)
+                if match:
+                    domain = match.group(1).strip()
+                    if domain != 'localhost' and domain != 'your-domain.com' and domain != '_':
+                        print(f"🔍 Detected existing SSL domain: {domain}")
+                        return domain
+        except Exception as e:
+            print(f"⚠️  Could not read existing nginx config: {e}")
+    
+    # Check for existing SSL certificates
+    try:
+        import subprocess
+        result = subprocess.run(['docker', 'compose', '-f', 'docker-compose-tools-ssl.yaml', 'run', '--rm', '--entrypoint=', 'certbot', 'ls', '/etc/letsencrypt/live/'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            for line in lines:
+                if line and not line.startswith('README') and '.' in line:
+                    print(f"🔍 Detected existing SSL certificate for: {line}")
+                    return line
+    except Exception as e:
+        print(f"⚠️  Could not check existing certificates: {e}")
+    
+    return None
+
 def generate_nginx_config(detected_tools, ssl=False, domain="localhost"):
     """Generate nginx configuration file."""
+    
+    # If SSL is enabled, try to detect existing domain configuration
+    if ssl and domain in ["localhost", "your-domain.com"]:
+        detected_domain = detect_ssl_domain()
+        if detected_domain:
+            domain = detected_domain
+            print(f"✅ Using detected SSL domain: {domain}")
+        else:
+            print(f"⚠️  No existing SSL domain detected, using placeholder: {domain}")
     
     # Base nginx config
     config = f"""events {{
