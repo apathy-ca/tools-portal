@@ -158,6 +158,11 @@ def get_client_info():
     remote_addr = request.remote_addr
     forwarded_for = request.headers.get('X-Forwarded-For')
     real_ip = request.headers.get('X-Real-IP')
+    forwarded_port = request.headers.get('X-Forwarded-Port')
+    
+    # Debug: Log all available headers for analysis
+    app.logger.debug(f"All headers: {dict(request.headers)}")
+    app.logger.debug(f"Environment: REMOTE_PORT={remote_port}, REMOTE_ADDR={remote_addr}")
     
     nat_detected = False
     nat_info = {}
@@ -178,7 +183,9 @@ def get_client_info():
                 'remote_addr': 'Unknown' if is_docker_ip else remote_addr,
                 'forwarded_for': forwarded_for,
                 'real_ip': real_ip,
-                'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected'
+                'forwarded_port': forwarded_port,
+                'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected',
+                'external_port': 'Unknown (NAT port translation not visible to server)'
             }
     
     return {

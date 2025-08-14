@@ -426,6 +426,10 @@
                             <span class="detail-label">Type:</span>
                             <span class="detail-value">{{ nat_detection.explanation }}</span>
                         </div>
+                        <div class="detail-row">
+                            <span class="detail-label">External Port:</span>
+                            <span class="detail-value">{{ nat_detection.external_port or 'Unknown (NAT port translation)' }}</span>
+                        </div>
                     </div>
                 </div>
 
