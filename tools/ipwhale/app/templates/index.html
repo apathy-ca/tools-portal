@@ -293,6 +293,10 @@
                 <h1>IP Whale</h1>
             </div>
             <div class="subtitle">This website will tell you your IP[v4|v6] addresses.</div>
+            <div class="subtitle" style="font-size: 0.9em; margin-top: 5px;">
+                Inspired by <a href="https://ipquail.com" target="_blank" style="color: #3498db;">ipquail.com</a> and 
+                <a href="https://ipchicken.com" target="_blank" style="color: #3498db;">ipchicken.com</a>
+            </div>
         </div>
 
         <div class="info-section">
@@ -356,13 +360,74 @@
         </div>
 
         <div class="advanced-section">
-            <div class="advanced-title">🔍 Advanced Connection Information</div>
+            <div class="advanced-title">
+                <img src="{{ url_for('static', filename='whale_eye_200x200.png') }}" alt="IP Whale Logo" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">
+                Advanced Connection Information
+            </div>
             
             <div class="info-row">
                 <span class="label">Test performed at:</span>
                 <span class="value">{{ timestamp }}</span>
             </div>
             
+            <!-- Complete IP Information -->
+            <div class="info-row">
+                <span class="label">Your public IPv4 address is:</span>
+                <span class="value {{ 'none-value' if not ipv4_address }}">
+                    {{ ipv4_address or 'None' }}
+                    {% if ipv4_address and nat_detection.detected %}
+                    <span style="color: #f39c12; font-size: 0.9em;"> (via NAT)</span>
+                    {% endif %}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv4 PTR is:</span>
+                <span class="value {{ 'none-value' if not ipv4_ptr }}">
+                    {{ ipv4_ptr or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv4 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv4_asn }}">
+                    {% if ipv4_asn %}
+                        {{ ipv4_asn }}{% if ipv4_asn_name %} ({{ ipv4_asn_name }}){% endif %}
+                    {% else %}
+                        None
+                    {% endif %}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your public IPv6 address is:</span>
+                <span class="value {{ 'none-value' if not ipv6_address }}">
+                    {{ ipv6_address or 'None' }}
+                    {% if ipv6_address and nat_detection.detected %}
+                    <span style="color: #f39c12; font-size: 0.9em;"> (via NAT)</span>
+                    {% endif %}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv6 PTR is:</span>
+                <span class="value {{ 'none-value' if not ipv6_ptr }}">
+                    {{ ipv6_ptr or 'None' }}
+                </span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Your IPv6 source ASN is:</span>
+                <span class="value {{ 'none-value' if not ipv6_asn }}">
+                    {% if ipv6_asn %}
+                        {{ ipv6_asn }}{% if ipv6_asn_name %} ({{ ipv6_asn_name }}){% endif %}
+                    {% else %}
+                        None
+                    {% endif %}
+                </span>
+            </div>
+            
+            <!-- Connection Details -->
             <div class="info-row">
                 <span class="label">Name Address:</span>
                 <span class="value">{{ ipv4_ptr or ipv6_ptr or 'Unknown' }}</span>
@@ -372,6 +437,13 @@
                 <span class="label">Remote Port:</span>
                 <span class="value">{{ remote_port }}</span>
             </div>
+            
+            {% if nat_detection.detected and nat_detection.client_public_port %}
+            <div class="info-row">
+                <span class="label">Public Port:</span>
+                <span class="value">{{ nat_detection.client_public_port }}</span>
+            </div>
+            {% endif %}
             
             <div class="info-row">
                 <span class="label">Browser:</span>

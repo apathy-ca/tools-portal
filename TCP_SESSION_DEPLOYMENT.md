@@ -56,9 +56,12 @@ cd tools-portal
 # Pull latest changes
 git pull
 
+# Generate proper nginx configuration with TCP session headers
+python generate-compose.py
+
 # Restart services to apply nginx configuration
-docker-compose -f docker-compose-tools-ssl.yaml down
-docker-compose -f docker-compose-tools-ssl.yaml up -d
+docker compose -f docker-compose-tools-ssl.yaml down
+docker compose -f docker-compose-tools-ssl.yaml up -d
 
 # Verify nginx configuration
 docker exec tools-nginx nginx -t
