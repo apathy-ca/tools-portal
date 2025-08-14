@@ -414,7 +414,47 @@ http {{
 
     # Add location blocks for detected tools
     for tool in detected_tools:
-        config += f"""
+        if tool == 'ipwhale':
+            # Special configuration for IPWhale with TCP session tracking
+            config += f"""
+        # IPWhale tool - Enhanced with TCP session tracking
+        location /{tool}/ {{
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://{tool}/;
+            proxy_set_header Host $host;
+            
+            # Standard proxy headers
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # CRITICAL: Pass real TCP session information
+            proxy_set_header X-Client-IP $remote_addr;
+            proxy_set_header X-Client-Port $remote_port;
+            proxy_set_header X-Server-IP $server_addr;
+            proxy_set_header X-Server-Port $server_port;
+            proxy_set_header X-Connection-ID $connection;
+            
+            # Additional connection details
+            proxy_set_header X-Request-ID $request_id;
+            proxy_set_header X-Nginx-Proxy "true";
+            
+            # Preserve original connection information
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_set_header X-Original-Method $request_method;
+            
+            # Connection settings
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }}
+"""
+        else:
+            # Standard configuration for other tools
+            config += f"""
         # {tool.replace('-', ' ').title()} tool
         location /{tool}/ {{
             limit_req zone=general burst=20 nodelay;
