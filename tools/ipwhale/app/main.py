@@ -151,27 +151,35 @@ def get_server_info():
 def get_client_info():
     """Get comprehensive client information including IP, port, and browser details."""
     client_ip = get_client_ip()
-    remote_port = request.environ.get('REMOTE_PORT', 'Unknown')
     user_agent = request.headers.get('User-Agent', 'Unknown')
+    
+    # Get TCP session information from nginx headers
+    client_port = request.headers.get('X-Client-Port', request.environ.get('REMOTE_PORT', 'Unknown'))
+    server_ip = request.headers.get('X-Server-IP', 'Unknown')
+    server_port = request.headers.get('X-Server-Port', 'Unknown')
+    connection_id = request.headers.get('X-Connection-ID', 'Unknown')
     
     # Detect if we're behind NAT by comparing different IP sources
     remote_addr = request.remote_addr
     forwarded_for = request.headers.get('X-Forwarded-For')
     real_ip = request.headers.get('X-Real-IP')
+    client_ip_header = request.headers.get('X-Client-IP')
     forwarded_port = request.headers.get('X-Forwarded-Port')
     
     # Debug: Log all available headers for analysis
     app.logger.debug(f"All headers: {dict(request.headers)}")
-    app.logger.debug(f"Environment: REMOTE_PORT={remote_port}, REMOTE_ADDR={remote_addr}")
+    app.logger.debug(f"Environment: REMOTE_PORT={client_port}, REMOTE_ADDR={remote_addr}")
+    app.logger.debug(f"TCP Session: Client={client_ip_header}:{client_port}, Server={server_ip}:{server_port}")
     
     nat_detected = False
     nat_info = {}
     
-    # Only detect NAT if we have proxy headers AND the IPs are different
-    # Also avoid showing Docker internal IPs (172.x.x.x, 10.x.x.x, 192.168.x.x)
-    if forwarded_for or real_ip:
-        forwarded_ip = (forwarded_for.split(',')[0].strip() if forwarded_for else real_ip)
-        if forwarded_ip and forwarded_ip != remote_addr:
+    # Enhanced NAT detection using nginx-provided information
+    if forwarded_for or real_ip or client_ip_header:
+        # Get the real client IP from nginx headers
+        real_client_ip = client_ip_header or (forwarded_for.split(',')[0].strip() if forwarded_for else real_ip)
+        
+        if real_client_ip and real_client_ip != remote_addr:
             # Check if remote_addr is a private/Docker IP that we shouldn't expose
             is_docker_ip = (remote_addr.startswith('172.') or 
                            remote_addr.startswith('10.') or 
@@ -180,18 +188,29 @@ def get_client_info():
             nat_detected = True
             nat_info = {
                 'detected': True,
+                'client_public_ip': real_client_ip,
+                'client_public_port': client_port,
+                'server_public_ip': server_ip,
+                'server_public_port': server_port,
+                'connection_id': connection_id,
                 'remote_addr': 'Unknown' if is_docker_ip else remote_addr,
                 'forwarded_for': forwarded_for,
                 'real_ip': real_ip,
                 'forwarded_port': forwarded_port,
-                'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected',
-                'external_port': 'Unknown (NAT port translation not visible to server)'
+                'explanation': 'Client is behind NAT/proxy - multiple IP addresses detected'
             }
     
     return {
         'ip': client_ip,
-        'remote_port': remote_port,
+        'remote_port': client_port,
         'user_agent': user_agent,
+        'tcp_session': {
+            'client_ip': client_ip_header or client_ip,
+            'client_port': client_port,
+            'server_ip': server_ip,
+            'server_port': server_port,
+            'connection_id': connection_id
+        },
         'nat_detection': nat_info if nat_detected else {'detected': False}
     }
 
