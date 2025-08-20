@@ -6,3 +6,7 @@
 	path = tools/ipwhale
 	url = https://github.com/apathy-ca/ipwhale.git
 	branch = main
+[submodule "tools/dnd-character-generator"]
+	path = tools/dnd-character-generator
+	url = ../dnd-character-generator
+	branch = master
