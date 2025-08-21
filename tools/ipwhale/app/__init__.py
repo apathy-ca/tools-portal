@@ -1,1 +1,0 @@
-# IPWhale Flask Application Package
