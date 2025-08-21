@@ -8,7 +8,14 @@ import os
 import sys
 import yaml
 import json
+import argparse
 from pathlib import Path
+
+# Fix encoding issues on Windows
+if sys.platform.startswith('win'):
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 def detect_tools():
     """Detect available tools based on submodule presence."""
@@ -134,16 +141,24 @@ def generate_base_services():
         }
     }
 
-def generate_nginx_service(detected_tools, ssl=False):
+def generate_nginx_service(detected_tools, ssl=False, bind_ip=None):
     """Generate nginx service configuration."""
     depends_on = ['tools-portal'] + detected_tools
+    
+    # Format port bindings based on whether bind_ip is specified
+    if bind_ip:
+        http_port = f'{bind_ip}:80:80'
+        https_port = f'{bind_ip}:443:443'
+    else:
+        http_port = '80:80'
+        https_port = '443:443'
     
     if ssl:
         return {
             'image': 'nginx:alpine',
             'container_name': 'tools-nginx',
             'restart': 'unless-stopped',
-            'ports': ['80:80', '443:443'],
+            'ports': [http_port, https_port],
             'volumes': [
                 './nginx-tools-ssl.conf:/etc/nginx/nginx.conf:ro',
                 './ssl:/etc/nginx/ssl:ro',
@@ -165,7 +180,7 @@ def generate_nginx_service(detected_tools, ssl=False):
             'image': 'nginx:alpine',
             'container_name': 'tools-nginx',
             'restart': 'unless-stopped',
-            'ports': ['80:80'],
+            'ports': [http_port],
             'volumes': ['./nginx-tools.conf:/etc/nginx/conf.d/default.conf:ro'],
             'depends_on': depends_on,
             'networks': ['tools-network'],
@@ -237,9 +252,9 @@ def generate_ssl_services():
         }
     }
 
-def generate_compose_file(ssl=False):
+def generate_compose_file(ssl=False, bind_ip=None):
     """Generate complete docker-compose configuration."""
-    print(f"🔧 Generating docker-compose configuration (SSL: {ssl})...")
+    print(f"🔧 Generating docker-compose configuration (SSL: {ssl}, Bind IP: {bind_ip or 'all interfaces'})...")
     
     detected_tools = detect_tools()
     
@@ -256,7 +271,7 @@ def generate_compose_file(ssl=False):
         compose['services'][tool] = get_tool_config(tool)
     
     # Add nginx
-    compose['services']['nginx'] = generate_nginx_service(detected_tools, ssl)
+    compose['services']['nginx'] = generate_nginx_service(detected_tools, ssl, bind_ip)
     
     # Add cleanup service if needed
     cleanup_service = generate_cleanup_service(detected_tools)
@@ -541,6 +556,26 @@ http {{
 
 def main():
     """Main function."""
+    parser = argparse.ArgumentParser(
+        description='Dynamic Docker Compose Generator for Tools Portal',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python generate-compose.py                           # Generate for all interfaces
+  python generate-compose.py --bind-ip 192.168.1.100  # Bind to specific IP
+  python generate-compose.py --bind-ip 10.0.0.50      # Bind to virtual IP
+        """
+    )
+    
+    parser.add_argument(
+        '--bind-ip',
+        type=str,
+        help='Specific IP address to bind the services to (e.g., 192.168.1.100). '
+             'If not specified, services will bind to all interfaces (0.0.0.0).'
+    )
+    
+    args = parser.parse_args()
+    
     print("🐋 Tools Portal - Dynamic Docker Compose Generator")
     print("=" * 50)
     
@@ -548,6 +583,18 @@ def main():
     if not os.path.exists('app.py'):
         print("❌ Error: Please run this script from the tools-portal directory")
         sys.exit(1)
+    
+    # Validate IP address if provided
+    if args.bind_ip:
+        import ipaddress
+        try:
+            ipaddress.ip_address(args.bind_ip)
+            print(f"🔗 Binding services to IP: {args.bind_ip}")
+        except ValueError:
+            print(f"❌ Error: Invalid IP address '{args.bind_ip}'")
+            sys.exit(1)
+    else:
+        print("🔗 Binding services to all interfaces (0.0.0.0)")
     
     detected_tools = detect_tools()
     
@@ -558,7 +605,7 @@ def main():
         nginx_filename = f'nginx-tools{suffix}.conf'
         
         # Generate docker-compose file
-        compose_config = generate_compose_file(ssl)
+        compose_config = generate_compose_file(ssl, args.bind_ip)
         with open(compose_filename, 'w') as f:
             yaml.dump(compose_config, f, default_flow_style=False, sort_keys=False)
         print(f"✅ Generated {compose_filename}")
@@ -572,6 +619,14 @@ def main():
         print(f"✅ Generated {nginx_filename}")
     
     print("\n🎉 Docker Compose and Nginx files generated successfully!")
+    
+    if args.bind_ip:
+        print(f"\n🔗 Services configured to bind to: {args.bind_ip}")
+        print(f"   Access your tools at: http://{args.bind_ip}/")
+    else:
+        print("\n🔗 Services configured to bind to all interfaces")
+        print("   Access your tools at: http://localhost/ or http://YOUR_IP/")
+    
     print("\n📋 Usage:")
     print("   Standard:  docker-compose -f docker-compose-tools.yaml up --build")
     print("   With SSL:  docker-compose -f docker-compose-tools-ssl.yaml up --build")
