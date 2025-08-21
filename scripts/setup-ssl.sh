@@ -16,6 +16,8 @@ NC='\033[0m' # No Color
 usage() {
     echo -e "${BLUE}Tools Portal SSL Setup${NC}"
     echo "Usage: $0 <domain> [email] [bind-ip]"
+    echo "   or: $0 <domain> [email] --bind-ip=<ip>"
+    echo "   or: $0 <domain> [email] --bind-ip <ip>"
     echo ""
     echo "Arguments:"
     echo "  domain    Your domain name (e.g., example.com)"
@@ -25,6 +27,8 @@ usage() {
     echo "Examples:"
     echo "  $0 example.com admin@example.com"
     echo "  $0 example.com admin@example.com 192.168.1.100"
+    echo "  $0 example.com admin@example.com --bind-ip=192.168.1.100"
+    echo "  $0 example.com admin@example.com --bind-ip 192.168.1.100"
     echo "  $0 example.com \"\" 10.0.0.50"
     echo "  $0 example.com"
     echo ""
@@ -35,15 +39,39 @@ usage() {
     echo "  - Git submodules initialized (git submodule update --init --recursive)"
 }
 
-# Check arguments
-if [ $# -lt 1 ]; then
+# Parse arguments - handle both positional and flag formats
+DOMAIN=""
+EMAIL=""
+BIND_IP=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --bind-ip=*)
+            BIND_IP="${1#*=}"
+            shift
+            ;;
+        --bind-ip)
+            BIND_IP="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$DOMAIN" ]; then
+                DOMAIN="$1"
+            elif [ -z "$EMAIL" ]; then
+                EMAIL="$1"
+            elif [ -z "$BIND_IP" ]; then
+                BIND_IP="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check required arguments
+if [ -z "$DOMAIN" ]; then
     usage
     exit 1
 fi
-
-DOMAIN=$1
-EMAIL=${2:-""}
-BIND_IP=${3:-""}
 
 echo -e "${GREEN}Tools Portal SSL Setup${NC}"
 echo "================================"
@@ -56,6 +84,27 @@ fi
 if ! [[ $DOMAIN =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
     echo -e "${RED}Error: Invalid domain format${NC}"
     exit 1
+fi
+
+# Validate bind IP format if provided
+if [ -n "$BIND_IP" ]; then
+    if ! [[ $BIND_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        echo -e "${RED}Error: Invalid IP address format: $BIND_IP${NC}"
+        echo "Please provide a valid IPv4 address (e.g., 192.168.1.100)"
+        exit 1
+    fi
+    
+    # Check if each octet is valid (0-255)
+    IFS='.' read -ra OCTETS <<< "$BIND_IP"
+    for octet in "${OCTETS[@]}"; do
+        if [ "$octet" -gt 255 ] || [ "$octet" -lt 0 ]; then
+            echo -e "${RED}Error: Invalid IP address: $BIND_IP${NC}"
+            echo "Each octet must be between 0 and 255"
+            exit 1
+        fi
+    done
+    
+    echo -e "${GREEN}✓ Valid bind IP address: $BIND_IP${NC}"
 fi
 
 # Check if domain resolves to this server
