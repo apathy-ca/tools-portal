@@ -15,14 +15,17 @@ NC='\033[0m' # No Color
 # Function to display usage
 usage() {
     echo -e "${BLUE}Tools Portal SSL Setup${NC}"
-    echo "Usage: $0 <domain> [email]"
+    echo "Usage: $0 <domain> [email] [bind-ip]"
     echo ""
     echo "Arguments:"
     echo "  domain    Your domain name (e.g., example.com)"
     echo "  email     Email for Let's Encrypt notifications (optional)"
+    echo "  bind-ip   Specific IP address to bind services to (optional)"
     echo ""
     echo "Examples:"
     echo "  $0 example.com admin@example.com"
+    echo "  $0 example.com admin@example.com 192.168.1.100"
+    echo "  $0 example.com \"\" 10.0.0.50"
     echo "  $0 example.com"
     echo ""
     echo "Prerequisites:"
@@ -40,10 +43,14 @@ fi
 
 DOMAIN=$1
 EMAIL=${2:-""}
+BIND_IP=${3:-""}
 
 echo -e "${GREEN}Tools Portal SSL Setup${NC}"
 echo "================================"
 echo -e "${YELLOW}Setting up SSL for domain: $DOMAIN${NC}"
+if [ -n "$BIND_IP" ]; then
+    echo -e "${YELLOW}Binding services to IP: $BIND_IP${NC}"
+fi
 
 # Validate domain format
 if ! [[ $DOMAIN =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
@@ -117,9 +124,15 @@ git submodule update --remote --force 2>/dev/null || git submodule update --init
 echo -e "${BLUE}Generating nginx configuration for domain: $DOMAIN${NC}"
 if [ -f "generate-compose.py" ]; then
     echo -e "${BLUE}Regenerating configuration files with detected tools...${NC}"
-    python3 generate-compose.py 2>/dev/null || python generate-compose.py 2>/dev/null || {
-        echo -e "${YELLOW}Warning: Could not run generate-compose.py, using existing files${NC}"
-    }
+    if [ -n "$BIND_IP" ]; then
+        python3 generate-compose.py --bind-ip "$BIND_IP" 2>/dev/null || python generate-compose.py --bind-ip "$BIND_IP" 2>/dev/null || {
+            echo -e "${YELLOW}Warning: Could not run generate-compose.py with bind-ip, using existing files${NC}"
+        }
+    else
+        python3 generate-compose.py 2>/dev/null || python generate-compose.py 2>/dev/null || {
+            echo -e "${YELLOW}Warning: Could not run generate-compose.py, using existing files${NC}"
+        }
+    fi
     
     # Update domain in the generated nginx config
     if [ -f "nginx-tools-ssl.conf" ]; then
