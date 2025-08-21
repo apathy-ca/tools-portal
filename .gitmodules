@@ -8,5 +8,5 @@
 	branch = main
 [submodule "tools/dnd-character-generator"]
 	path = tools/dnd-character-generator
-	url = ../dnd-character-generator
+	url = https://gitlab.henrynet.ca/jhenry/dandd.git
 	branch = master
