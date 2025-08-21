@@ -156,6 +156,7 @@ def detailed_health():
             'error': str(e)
         }
     
+    
     # System metrics
     try:
         health_status['metrics'] = {
@@ -193,6 +194,7 @@ def ipwhale_redirect():
 def ipwhale_subpaths(path):
     """Handle IP Whale subpaths - this will be handled by nginx proxy."""
     return redirect('/')
+
 
 @app.route('/static/<path:filename>')
 def static_files(filename):

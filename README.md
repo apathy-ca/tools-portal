@@ -24,13 +24,21 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
 - **Access**: Available at `/dns-by-eye/` endpoint
 - **Repository**: [DNS By Eye](https://github.com/apathy-ca/dns_by_eye)
 
+### IP Whale
+IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection.
+
+- **Features**: IPv4/IPv6 detection, PTR record lookup, ASN information, NAT detection, remote port detection
+- **Access**: Available at `/ipwhale/` endpoint
+
+*Additional tools are automatically detected and integrated when added to the `tools/` directory as git submodules.*
+
 ## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│   nginx         │    │ Tools Portal │    │   DNS By Eye    │
-│   (SSL/Proxy)   │────│   (Flask)    │────│    (Flask)      │
-│   Port 443/80   │    │   Port 5000  │    │   Port 5001     │
+│   nginx         │    │ Tools Portal │    │   Tool Services │
+│   (SSL/Proxy)   │────│   (Flask)    │────│   (Dynamic)     │
+│   Port 443/80   │    │   Port 5000  │    │   Port 5001+    │
 └─────────────────┘    └──────────────┘    └─────────────────┘
          │                       │                    │
          │              ┌──────────────┐             │
@@ -39,6 +47,8 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
                         │   Port 6379  │
                         └──────────────┘
 ```
+
+Tools are dynamically detected from the `tools/` directory and automatically integrated into the platform.
 
 ## Quick Start
 
@@ -62,13 +72,19 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
    git submodule update --init --recursive
    ```
 
-2. **Configure your domain**:
+2. **Generate configuration files**:
    ```bash
-   # Update nginx-tools-ssl.conf with your domain name
-   sed -i 's/tools.apathy.ca/your-domain.com/g' nginx-tools-ssl.conf
+   # Generate docker-compose and nginx configuration files
+   python generate-compose.py
    ```
 
-3. **Deploy with SSL (Production)**:
+3. **Configure your domain (SSL only)**:
+   ```bash
+   # Update nginx-tools-ssl.conf with your domain name
+   sed -i 's/your-domain.com/your-actual-domain.com/g' nginx-tools-ssl.conf
+   ```
+
+4. **Deploy with SSL (Production)**:
    ```bash
    # Set up SSL certificates first
    ./scripts/setup-ssl.sh your-domain.com admin@your-domain.com
@@ -77,16 +93,16 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
    sudo docker compose -f docker-compose-tools-ssl.yaml up -d
    ```
 
-4. **Deploy without SSL (Development)**:
+5. **Deploy without SSL (Development)**:
    ```bash
    # For local development/testing
    sudo docker compose -f docker-compose-tools.yaml up -d
    ```
 
-5. **Access the portal**:
+6. **Access the portal**:
    - **Production**: `https://your-domain.com/`
    - **Development**: `http://localhost/`
-   - **DNS By Eye**: `https://your-domain.com/dns-by-eye/` or `http://localhost/dns-by-eye/`
+   - **Tools**: `https://your-domain.com/{tool-name}/` or `http://localhost/{tool-name}/`
 
 ## Configuration Files
 
@@ -106,24 +122,18 @@ Comprehensive DNS delegation analysis tool with visual graphs, health scoring, a
 
 ## Adding New Tools
 
-To add a new tool to the platform:
+Tools are automatically detected and integrated when added to the `tools/` directory. See [`EXAMPLE_TOOL_INTEGRATION.md`](EXAMPLE_TOOL_INTEGRATION.md) for detailed instructions.
 
-1. **Create tool directory**: Add your tool in a subdirectory
-2. **Update docker-compose**: Add service configuration
-3. **Update nginx config**: Add routing rules
-4. **Update landing page**: Add tool to `templates/index.html`
+### Quick Process:
+1. **Add tool as submodule**: `git submodule add <repo-url> tools/your-tool`
+2. **Generate configuration**: `python generate-compose.py`
+3. **Deploy**: `docker-compose -f docker-compose-tools.yaml up --build`
 
-Example service addition:
-```yaml
-your-tool:
-  build: ./tools/your-tool
-  container_name: your-tool
-  restart: unless-stopped
-  networks:
-    - tools-network
-  depends_on:
-    - redis
-```
+The system automatically:
+- Detects tools with Dockerfiles in `tools/` directory
+- Loads tool configuration from `config.py` if present
+- Generates docker-compose and nginx configurations
+- Integrates tools into the portal interface
 
 ## Security Features
 
@@ -137,7 +147,7 @@ your-tool:
 
 ### Health Checks
 - Tools Portal: `GET /api/health`
-- DNS By Eye: `GET /dns-by-eye/api/health`
+- Individual Tools: `GET /{tool-name}/api/health`
 
 ### Logs
 ```bash
@@ -190,59 +200,30 @@ git push origin main
 
 ### Adding New Tools
 
-To add a new tool as a submodule:
+Tools are automatically detected and integrated. See [`EXAMPLE_TOOL_INTEGRATION.md`](EXAMPLE_TOOL_INTEGRATION.md) for complete instructions.
 
-1. **Add the tool as a submodule**:
+**Quick Steps:**
+1. **Add tool as submodule**:
    ```bash
    git submodule add https://github.com/your-org/your-tool.git tools/your-tool
    ```
 
-2. **Update docker-compose configuration**:
-   ```yaml
-   your-tool:
-     build:
-       context: ./tools/your-tool
-       dockerfile: Dockerfile
-     container_name: your-tool
-     restart: unless-stopped
-     networks:
-       - tools-network
-     depends_on:
-       - redis
-   ```
-
-3. **Update nginx routing** in `nginx-tools-ssl.conf`:
-   ```nginx
-   # Your Tool
-   location /your-tool/ {
-       limit_req zone=general burst=20 nodelay;
-       rewrite ^/your-tool/(.*)$ /$1 break;
-       proxy_pass http://your_tool;
-       # ... proxy headers
-   }
-   ```
-
-4. **Update tool registry** in `app.py`:
-   ```python
-   TOOLS = {
-       'your-tool': {
-           'name': 'Your Tool',
-           'description': 'Description of your tool',
-           'version': '1.0.0',
-           'url': '/your-tool/',
-           'icon': '🔧',
-           'category': 'System Administration',
-           'status': 'stable'
-       }
-   }
-   ```
-
-5. **Commit the integration**:
+2. **Generate configuration**:
    ```bash
-   git add .
-   git commit -m "Add Your Tool as submodule"
-   git push origin main
+   python generate-compose.py
    ```
+
+3. **Deploy**:
+   ```bash
+   docker-compose -f docker-compose-tools.yaml up --build
+   ```
+
+**Tool Requirements:**
+- Must have a `Dockerfile` in the tool directory
+- Should include `config.py` with `TOOL_INFO` for proper integration
+- Must provide `/api/health` endpoint on port 5000
+
+The system automatically generates docker-compose files, nginx routing, and portal integration.
 
 ## Production Deployment
 

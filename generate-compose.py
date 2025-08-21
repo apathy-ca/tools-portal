@@ -75,6 +75,25 @@ def get_tool_config(tool_name):
                 'timeout': '10s',
                 'retries': 3
             }
+        },
+        'dnd-character-generator': {
+            'build': {
+                'context': './tools/dnd-character-generator',
+                'dockerfile': 'Dockerfile'
+            },
+            'container_name': 'dnd-character-generator',
+            'restart': 'unless-stopped',
+            'environment': [
+                'FLASK_ENV=production',
+                'STATIC_URL_PATH=/dnd-character-generator/static'
+            ],
+            'networks': ['tools-network'],
+            'healthcheck': {
+                'test': ['CMD', 'curl', '-f', 'http://localhost:5000/api/health'],
+                'interval': '30s',
+                'timeout': '10s',
+                'retries': 3
+            }
         }
     }
     
