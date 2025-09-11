@@ -1,10 +1,10 @@
-# Example Tool Integration: D&D Character Generator
+# Example Tool Integration Guide
 
-This document demonstrates how to properly integrate a new tool into the Tools Portal using the D&D Character Generator as an example.
+This document demonstrates how to properly integrate a new tool into the Tools Portal using a generic example.
 
 ## Overview
 
-The Tools Portal uses a dynamic tool detection system that automatically discovers and integrates tools placed in the `tools/` directory. This example shows the complete integration process.
+The Tools Portal uses a dynamic tool detection system that automatically discovers and integrates tools placed in the `tools/` directory. This guide shows the complete integration process.
 
 ## Tool Structure
 
@@ -18,7 +18,7 @@ tools/your-tool-name/
 └── README.md               # Tool-specific documentation
 ```
 
-## Example: D&D Character Generator
+## Example Tool Configuration
 
 ### 1. Tool Configuration (`config.py`)
 
@@ -28,23 +28,20 @@ Tool Configuration for Tools Portal Dynamic Detection
 """
 
 TOOL_INFO = {
-    'name': 'D&D Character Generator',
-    'description': 'Comprehensive D&D 5e character creator with races, classes, backgrounds, and ability score generation',
+    'name': 'Your Tool Name',
+    'description': 'Brief description of what your tool does',
     'version': '1.0.0',
-    'url': '/dnd-character-generator/',
-    'icon': '🐉',
-    'category': 'Gaming & Entertainment',
+    'url': '/your-tool-name/',
+    'icon': '🔧',
+    'category': 'Utilities',
     'status': 'stable',
     'features': [
-        'Multiple ability score generation methods',
-        'All core D&D 5e races and classes',
-        'Background selection with personality traits',
-        'Character sheet generation',
-        'Export to Markdown and PDF',
-        'Character library with save/load',
+        'Feature 1',
+        'Feature 2',
+        'Feature 3',
         'Responsive design for all devices'
     ],
-    'tags': ['dnd', 'rpg', 'character-creation', 'gaming', 'tabletop']
+    'tags': ['utility', 'tool', 'example']
 }
 ```
 
@@ -75,7 +72,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
 # Start the application
-CMD ["python", "flask_wrapper.py"]
+CMD ["python", "app.py"]
 ```
 
 ### 3. Health Check Endpoint
@@ -87,7 +84,7 @@ Every tool must provide a health check endpoint at `/api/health`:
 def health_check():
     return jsonify({
         'status': 'healthy',
-        'service': 'dnd-character-generator',
+        'service': 'your-tool-name',
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'version': '1.0.0'
     })
@@ -214,16 +211,16 @@ curl http://localhost:5000/api/health
 
 ## Example Tools
 
-The D&D Character Generator demonstrates:
-- ✅ Hybrid architecture (Flask frontend + FastAPI backend)
+Current integrated tools demonstrate:
+- ✅ DNS analysis and visualization (dns-by-eye)
+- ✅ IP geolocation and analysis (ipwhale)
 - ✅ Proper health check implementation
 - ✅ Complete tool configuration
-- ✅ Category assignment (Gaming & Entertainment)
-- ✅ Feature-rich description
+- ✅ Category assignment
+- ✅ Feature-rich descriptions
 - ✅ Responsive design
-- ✅ Export capabilities
 
-This serves as a reference implementation for integrating complex tools with multiple components.
+These serve as reference implementations for integrating tools with the portal.
 
 ## Support
 

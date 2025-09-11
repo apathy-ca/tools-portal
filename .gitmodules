@@ -2,10 +2,6 @@
 	path = tools/dns-by-eye
 	url = https://github.com/apathy-ca/dns_by_eye.git
 	branch = main
-[submodule "tools/dnd-character-generator"]
-	path = tools/dnd-character-generator
-	url = https://gitlab.henrynet.ca/jhenry/dandd.git
-	branch = master
 [submodule "tools/ipwhale"]
 	path = tools/ipwhale
 	url = https://github.com/apathy-ca/ipwhale.git
