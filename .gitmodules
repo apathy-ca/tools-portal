@@ -5,3 +5,4 @@
 [submodule "tools/ipwhale"]
 	path = tools/ipwhale
 	url = https://github.com/apathy-ca/ipwhale.git
+	branch = main
