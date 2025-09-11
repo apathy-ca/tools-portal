@@ -186,7 +186,7 @@ python dynamic_tools.py
 ### 3. Test Deployment
 ```bash
 # Build and test
-docker-compose -f docker-compose-tools.yaml up --build your-tool-name
+docker compose -f docker-compose-tools.yaml up --build your-tool-name
 
 # Test health endpoint
 curl http://localhost:5000/api/health

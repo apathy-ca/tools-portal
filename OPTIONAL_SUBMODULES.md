@@ -31,16 +31,16 @@ git submodule update --init --recursive tools/dnd-character-generator
 python generate-compose.py
 ```
 
-This will automatically detect the new tool and add it to the docker-compose configuration.
+This will automatically detect the new tool and add it to the docker compose configuration.
 
 #### Step 4: Deploy with the New Tool
 
 ```bash
 # Standard deployment
-docker-compose -f docker-compose-tools.yaml up --build
+docker compose -f docker-compose-tools.yaml up --build
 
-# SSL deployment  
-docker-compose -f docker-compose-tools-ssl.yaml up --build
+# SSL deployment
+docker compose -f docker-compose-tools-ssl.yaml up --build
 ```
 
 ## Removing Optional Submodules
@@ -70,7 +70,7 @@ python generate-compose.py
 ### Step 3: Redeploy
 
 ```bash
-docker-compose -f docker-compose-tools.yaml up --build
+docker compose -f docker-compose-tools.yaml up --build
 ```
 
 ## Available Optional Submodules
@@ -102,7 +102,7 @@ docker-compose -f docker-compose-tools.yaml up --build
 - Ensure the tool follows the standard port 5000 convention
 
 ### Deployment Issues
-- Regenerate docker-compose files after adding/removing submodules
+- Regenerate docker compose files after adding/removing submodules
 - Restart the entire stack to ensure proper routing configuration
 - Check nginx configuration includes the new tool routes
 
