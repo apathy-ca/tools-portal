@@ -149,17 +149,17 @@ curl http://localhost:5000/api/ai/models
 cp .env.ai.example .env
 
 # Build and start services
-docker-compose -f docker-compose.ai.yml up --build -d
+docker compose -f docker compose.ai.yml up --build -d
 ```
 
 ### 2. Test Containerized Deployment
 
 ```bash
 # Check service status
-docker-compose -f docker-compose.ai.yml ps
+docker compose -f docker compose.ai.yml ps
 
 # Check logs
-docker-compose -f docker-compose.ai.yml logs tools-portal-ai
+docker compose -f docker compose.ai.yml logs tools-portal-ai
 
 # Test health endpoints
 curl http://localhost/health

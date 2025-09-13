@@ -37,13 +37,13 @@ def main():
     print(f"\n📂 Categories: {', '.join(categories.keys())}")
     
     print("\n🐋 Docker Deployment:")
-    print("   The existing docker-compose files will work with detected tools.")
+    print("   The existing docker compose files will work with detected tools.")
     print("   To deploy all detected tools:")
     print("   ")
-    print("   docker-compose -f docker-compose-tools.yaml up --build")
+    print("   docker compose -f docker compose-tools.yaml up --build")
     print("   ")
     print("   Or with SSL:")
-    print("   docker-compose -f docker-compose-tools-ssl.yaml up --build")
+    print("   docker compose -f docker compose-tools-ssl.yaml up --build")
     
     print("\n💡 To add/remove tools:")
     print("   1. Add/remove git submodules in tools/ directory:")
@@ -51,8 +51,8 @@ def main():
     print("      git submodule deinit tools/tool-name && git rm tools/tool-name")
     print("   ")
     print("   2. Restart the deployment:")
-    print("      docker-compose -f docker-compose-tools.yaml down")
-    print("      docker-compose -f docker-compose-tools.yaml up --build")
+    print("      docker compose -f docker compose-tools.yaml down")
+    print("      docker compose -f docker compose-tools.yaml up --build")
     
     print("\n🌐 Access Points (after deployment):")
     print("   • Tools Portal: http://localhost/")

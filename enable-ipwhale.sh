@@ -54,10 +54,10 @@ echo "🚀 Starting IPWhale deployment..."
 
 # Build and start IPWhale
 echo "🔨 Building IPWhale container..."
-docker-compose -f docker-compose-tools.yaml build ipwhale
+docker compose -f docker-compose-tools.yaml build ipwhale
 
 echo "🏃 Starting IPWhale service..."
-docker-compose -f docker-compose-tools.yaml up -d ipwhale
+docker compose -f docker-compose-tools.yaml up -d ipwhale
 
 # Wait a moment for startup
 echo "⏳ Waiting for IPWhale to start..."
@@ -83,7 +83,7 @@ echo "   Full API:      http://localhost/ipwhale/api/full"
 echo ""
 echo "🔧 Management Commands:"
 echo "   View logs:     docker logs ipwhale"
-echo "   Restart:       docker-compose -f docker-compose-tools.yaml restart ipwhale"
-echo "   Update:        git submodule update --remote tools/ipwhale && docker-compose -f docker-compose-tools.yaml up --build ipwhale"
+echo "   Restart:       docker compose -f docker-compose-tools.yaml restart ipwhale"
+echo "   Update:        git submodule update --remote tools/ipwhale && docker compose -f docker-compose-tools.yaml up --build ipwhale"
 echo ""
 echo "📚 For more information, see IPWHALE_DEPLOYMENT_GUIDE.md"

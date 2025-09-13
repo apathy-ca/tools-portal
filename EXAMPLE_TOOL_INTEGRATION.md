@@ -107,17 +107,17 @@ python generate-compose.py
 This automatically:
 - Detects the new tool (looks for Dockerfile)
 - Loads tool configuration from `config.py` if present
-- Generates docker-compose files with the new service
+- Generates docker compose files with the new service
 - Updates nginx configuration with routing
 - Adds the tool to the portal's tool registry
 
 ### Step 3: Deploy
 ```bash
 # Standard deployment
-docker-compose -f docker-compose-tools.yaml up --build
+docker compose -f docker compose-tools.yaml up --build
 
 # SSL deployment
-docker-compose -f docker-compose-tools-ssl.yaml up --build
+docker compose -f docker compose-tools-ssl.yaml up --build
 ```
 
 ## Dynamic Detection Features
@@ -179,14 +179,14 @@ python dynamic_tools.py
 ```
 
 ### 2. Check Generated Files
-- `docker-compose-tools.yaml` - Should include your tool service
+- `docker compose-tools.yaml` - Should include your tool service
 - `nginx-tools.conf` - Should include routing for your tool
 - Tool should appear in portal's tool registry
 
 ### 3. Test Deployment
 ```bash
 # Build and test
-docker compose -f docker-compose-tools.yaml up --build your-tool-name
+docker compose -f docker compose-tools.yaml up --build your-tool-name
 
 # Test health endpoint
 curl http://localhost:5000/api/health

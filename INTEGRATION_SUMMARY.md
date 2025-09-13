@@ -87,7 +87,7 @@ The integration is complete and ready for deployment. The following components w
 ```bash
 cd tools-portal
 git submodule update --init --recursive
-sudo docker compose -f docker-compose-tools-ssl.yaml up -d
+sudo docker compose -f docker compose-tools-ssl.yaml up -d
 ```
 
 ### SSL Setup
@@ -134,10 +134,10 @@ git push origin main
 #### Static File Configuration
 - **Flask Dynamic Configuration**: Added `STATIC_URL_PATH` environment variable support
   - Flask reads `STATIC_URL_PATH` from environment for dynamic static path configuration
-  - When integrated: `STATIC_URL_PATH=/dns-by-eye/static` in docker-compose
+  - When integrated: `STATIC_URL_PATH=/dns-by-eye/static` in docker compose
   - When standalone: Defaults to `/static` for backward compatibility
 - **URL Generation**: `url_for('static', filename='...')` generates correct paths automatically
-- **Docker Environment**: Added `STATIC_URL_PATH=/dns-by-eye/static` to both docker-compose files
+- **Docker Environment**: Added `STATIC_URL_PATH=/dns-by-eye/static` to both docker compose files
 
 #### API Path Routing Fixes
 - **Relative URLs**: Changed all frontend API calls from absolute (`/api/`) to relative (`api/`) paths
@@ -187,13 +187,13 @@ If issues persist after deployment:
 1. **Clear Browser Cache**: Hard refresh (Ctrl+F5) to clear cached JavaScript
 2. **Rebuild Containers**: Use `--no-cache` flag to ensure latest code
    ```bash
-   sudo docker compose -f docker-compose-tools-ssl.yaml down
-   sudo docker compose -f docker-compose-tools-ssl.yaml build --no-cache
-   sudo docker compose -f docker-compose-tools-ssl.yaml up -d
+   sudo docker compose -f docker compose-tools-ssl.yaml down
+   sudo docker compose -f docker compose-tools-ssl.yaml build --no-cache
+   sudo docker compose -f docker compose-tools-ssl.yaml up -d
    ```
 3. **Check Container Logs**: Verify services are running correctly
    ```bash
-   sudo docker compose -f docker-compose-tools-ssl.yaml logs dns-by-eye
+   sudo docker compose -f docker compose-tools-ssl.yaml logs dns-by-eye
    ```
 
 ## Status: ✅ INTEGRATION COMPLETE AND OPERATIONAL

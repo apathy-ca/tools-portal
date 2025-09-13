@@ -60,8 +60,8 @@ git pull
 python generate-compose.py
 
 # Restart services to apply nginx configuration
-docker compose -f docker-compose-tools-ssl.yaml down
-docker compose -f docker-compose-tools-ssl.yaml up -d
+docker compose -f docker compose-tools-ssl.yaml down
+docker compose -f docker compose-tools-ssl.yaml up -d
 
 # Verify nginx configuration
 docker exec tools-nginx nginx -t
@@ -118,7 +118,7 @@ def get_client_info():
 For even more detailed connection information, IPWhale can be deployed with a dedicated IP:
 
 ```yaml
-# docker-compose-ipwhale-dedicated.yaml
+# docker compose-ipwhale-dedicated.yaml
 services:
   ipwhale-dedicated:
     build:

@@ -9,7 +9,7 @@ Write-Host "🐋 IPWhale Enablement Script (Windows)" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 
 # Check if we're in the tools-portal directory
-if (-not (Test-Path "docker-compose-tools.yaml")) {
+if (-not (Test-Path "docker compose-tools.yaml")) {
     Write-Host "❌ Error: Please run this script from the tools-portal directory" -ForegroundColor Red
     exit 1
 }
@@ -42,12 +42,12 @@ if (Select-String -Path "app.py" -Pattern "ipwhale" -Quiet) {
     Write-Host "   Please ensure IPWhale is added to the TOOLS registry in app.py" -ForegroundColor Yellow
 }
 
-# Check if IPWhale is in docker-compose
-if (Select-String -Path "docker-compose-tools.yaml" -Pattern "ipwhale:" -Quiet) {
-    Write-Host "✅ IPWhale already configured in docker-compose-tools.yaml" -ForegroundColor Green
+# Check if IPWhale is in docker compose
+if (Select-String -Path "docker compose-tools.yaml" -Pattern "ipwhale:" -Quiet) {
+    Write-Host "✅ IPWhale already configured in docker compose-tools.yaml" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  IPWhale not found in docker-compose-tools.yaml" -ForegroundColor Yellow
-    Write-Host "   Please ensure IPWhale service is defined in docker-compose-tools.yaml" -ForegroundColor Yellow
+    Write-Host "⚠️  IPWhale not found in docker compose-tools.yaml" -ForegroundColor Yellow
+    Write-Host "   Please ensure IPWhale service is defined in docker compose-tools.yaml" -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -55,10 +55,10 @@ Write-Host "🚀 Starting IPWhale deployment..." -ForegroundColor Cyan
 
 # Build and start IPWhale
 Write-Host "🔨 Building IPWhale container..." -ForegroundColor Yellow
-docker-compose -f docker-compose-tools.yaml build ipwhale
+docker compose -f docker compose-tools.yaml build ipwhale
 
 Write-Host "🏃 Starting IPWhale service..." -ForegroundColor Yellow
-docker-compose -f docker-compose-tools.yaml up -d ipwhale
+docker compose -f docker compose-tools.yaml up -d ipwhale
 
 # Wait a moment for startup
 Write-Host "⏳ Waiting for IPWhale to start..." -ForegroundColor Yellow
@@ -89,8 +89,8 @@ Write-Host "   Full API:      http://localhost/ipwhale/api/full" -ForegroundColo
 Write-Host ""
 Write-Host "🔧 Management Commands:" -ForegroundColor Cyan
 Write-Host "   View logs:     docker logs ipwhale" -ForegroundColor White
-Write-Host "   Restart:       docker-compose -f docker-compose-tools.yaml restart ipwhale" -ForegroundColor White
-Write-Host "   Update:        git submodule update --remote tools/ipwhale; docker-compose -f docker-compose-tools.yaml up --build ipwhale" -ForegroundColor White
+Write-Host "   Restart:       docker compose -f docker compose-tools.yaml restart ipwhale" -ForegroundColor White
+Write-Host "   Update:        git submodule update --remote tools/ipwhale; docker compose -f docker compose-tools.yaml up --build ipwhale" -ForegroundColor White
 Write-Host ""
 Write-Host "📚 For more information, see IPWHALE_DEPLOYMENT_GUIDE.md" -ForegroundColor Cyan
 

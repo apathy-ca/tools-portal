@@ -104,7 +104,7 @@ CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]
 
 ### Enhanced Docker Compose
 
-Create `docker-compose.ai.yml`:
+Create `docker compose.ai.yml`:
 ```yaml
 version: '3.8'
 
@@ -360,11 +360,11 @@ docker network create symposium-network
 
 # Start Symposium first
 cd /path/to/symposium
-docker-compose up -d
+docker compose up -d
 
 # Then start Tools Portal with AI
 cd /path/to/tools-portal
-docker-compose -f docker-compose.ai.yml up -d
+docker compose -f docker compose.ai.yml up -d
 ```
 
 ### Environment Variables
@@ -474,4 +474,4 @@ cp config_original.py config.py
 cp requirements_original.txt requirements.txt
 
 # Restart services
-docker-compose restart
+docker compose restart

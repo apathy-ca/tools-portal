@@ -37,10 +37,10 @@ This will automatically detect the new tool and add it to the docker compose con
 
 ```bash
 # Standard deployment
-docker compose -f docker-compose-tools.yaml up --build
+docker compose -f docker compose-tools.yaml up --build
 
 # SSL deployment
-docker compose -f docker-compose-tools-ssl.yaml up --build
+docker compose -f docker compose-tools-ssl.yaml up --build
 ```
 
 ## Removing Optional Submodules
@@ -70,7 +70,7 @@ python generate-compose.py
 ### Step 3: Redeploy
 
 ```bash
-docker compose -f docker-compose-tools.yaml up --build
+docker compose -f docker compose-tools.yaml up --build
 ```
 
 ## Available Optional Submodules

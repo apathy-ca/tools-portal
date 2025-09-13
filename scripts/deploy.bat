@@ -76,8 +76,8 @@ echo.
 echo 🎉 Deployment preparation complete!
 echo.
 echo 📋 Next steps:
-echo    For development: docker-compose -f docker-compose-tools.yaml up --build
-echo    For production:  docker-compose -f docker-compose-tools-ssl.yaml up --build
+echo    For development: docker compose -f docker compose-tools.yaml up --build
+echo    For production:  docker compose -f docker compose-tools-ssl.yaml up --build
 echo.
 echo ⚠️  For SSL deployment, make sure to:
 echo    1. Update nginx-tools-ssl.conf with your domain

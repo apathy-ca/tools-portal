@@ -1,5 +1,5 @@
 # Enhanced monitoring stack for Tools Portal
-# Add this to your existing docker-compose-tools-ssl.yaml or run separately
+# Add this to your existing docker-compose-tools-ssl.yaml or run separately with docker compose
 
 services:
   # Prometheus for metrics collection

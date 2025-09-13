@@ -49,12 +49,12 @@ echo -e "${BLUE}1. Checking Docker installation...${NC}"
 if command -v docker >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Docker is installed${NC}"
     docker --version
-    if command -v docker-compose >/dev/null 2>&1; then
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Docker Compose is installed${NC}"
-        docker-compose --version
+        docker compose version
     else
         echo -e "${RED}✗ Docker Compose not found${NC}"
-        echo "Install with: sudo apt-get install docker-compose"
+        echo "Install with: sudo apt-get install docker compose-plugin"
     fi
 else
     echo -e "${RED}✗ Docker is not installed${NC}"
@@ -115,7 +115,7 @@ echo ""
 
 # Check Docker services status
 echo -e "${BLUE}4. Checking Docker services...${NC}"
-if [ -f "docker-compose.yaml" ]; then
+if [ -f "docker compose.yaml" ]; then
     echo "Basic Docker Compose services:"
     if docker compose ps 2>/dev/null | grep -q "Up"; then
         echo -e "${GREEN}✓ Some basic services are running${NC}"
@@ -127,21 +127,21 @@ if [ -f "docker-compose.yaml" ]; then
     echo ""
 fi
 
-if [ -f "docker-compose.ssl.yaml" ]; then
+if [ -f "docker compose.ssl.yaml" ]; then
     echo "SSL Docker Compose services:"
-    if docker compose -f docker-compose.ssl.yaml ps 2>/dev/null | grep -q "Up"; then
+    if docker compose -f docker compose.ssl.yaml ps 2>/dev/null | grep -q "Up"; then
         echo -e "${GREEN}✓ Some SSL services are running${NC}"
-        docker compose -f docker-compose.ssl.yaml ps
+        docker compose -f docker compose.ssl.yaml ps
     else
         echo -e "${RED}✗ No SSL services appear to be running${NC}"
-        echo "Try: docker compose -f docker-compose.ssl.yaml up -d"
+        echo "Try: docker compose -f docker compose.ssl.yaml up -d"
     fi
     echo ""
 fi
 
 # Check configuration files
 echo -e "${BLUE}5. Checking configuration files...${NC}"
-config_files=("nginx.conf" "nginx-http.conf" "docker-compose.yaml" "docker-compose.ssl.yaml")
+config_files=("nginx.conf" "nginx-http.conf" "docker compose.yaml" "docker compose.ssl.yaml")
 for file in "${config_files[@]}"; do
     if [ -f "$file" ]; then
         echo -e "${GREEN}✓ $file exists${NC}"
@@ -153,12 +153,12 @@ echo ""
 
 # Check nginx configuration (if running)
 echo -e "${BLUE}6. Checking nginx configuration...${NC}"
-if docker compose -f docker-compose.ssl.yaml ps nginx 2>/dev/null | grep -q "Up"; then
-    if docker compose -f docker-compose.ssl.yaml exec nginx nginx -t 2>/dev/null; then
+if docker compose -f docker compose.ssl.yaml ps nginx 2>/dev/null | grep -q "Up"; then
+    if docker compose -f docker compose.ssl.yaml exec nginx nginx -t 2>/dev/null; then
         echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
     else
         echo -e "${RED}✗ Nginx configuration has errors${NC}"
-        docker compose -f docker-compose.ssl.yaml exec nginx nginx -t
+        docker compose -f docker compose.ssl.yaml exec nginx nginx -t
     fi
 elif docker compose ps nginx 2>/dev/null | grep -q "Up"; then
     if docker compose exec nginx nginx -t 2>/dev/null; then
@@ -175,10 +175,10 @@ echo ""
 # Check SSL certificates (if domain provided)
 if [ -n "$DOMAIN" ]; then
     echo -e "${BLUE}7. Checking SSL certificates...${NC}"
-    if docker compose -f docker-compose.ssl.yaml run --rm certbot ls /etc/letsencrypt/live/$DOMAIN/ 2>/dev/null; then
+    if docker compose -f docker compose.ssl.yaml run --rm certbot ls /etc/letsencrypt/live/$DOMAIN/ 2>/dev/null; then
         echo -e "${GREEN}✓ SSL certificates exist for $DOMAIN${NC}"
         echo "Certificate details:"
-        docker compose -f docker-compose.ssl.yaml run --rm certbot certbot certificates 2>/dev/null | grep -A 10 "$DOMAIN" || true
+        docker compose -f docker compose.ssl.yaml run --rm certbot certbot certificates 2>/dev/null | grep -A 10 "$DOMAIN" || true
     else
         echo -e "${RED}✗ No SSL certificates found for $DOMAIN${NC}"
         echo "Generate certificates with: ./scripts/setup-ssl.sh $DOMAIN"
@@ -202,8 +202,8 @@ fi
 # Show recent logs
 echo -e "${BLUE}9. Recent service logs...${NC}"
 echo -e "${YELLOW}Web application logs:${NC}"
-if docker compose -f docker-compose.ssl.yaml ps web 2>/dev/null | grep -q "Up"; then
-    docker compose -f docker-compose.ssl.yaml logs --tail=10 web 2>/dev/null || echo "No SSL web logs available"
+if docker compose -f docker compose.ssl.yaml ps web 2>/dev/null | grep -q "Up"; then
+    docker compose -f docker compose.ssl.yaml logs --tail=10 web 2>/dev/null || echo "No SSL web logs available"
 elif docker compose ps web 2>/dev/null | grep -q "Up"; then
     docker compose logs --tail=10 web 2>/dev/null || echo "No basic web logs available"
 else
@@ -212,8 +212,8 @@ fi
 echo ""
 
 echo -e "${YELLOW}Nginx logs:${NC}"
-if docker compose -f docker-compose.ssl.yaml ps nginx 2>/dev/null | grep -q "Up"; then
-    docker compose -f docker-compose.ssl.yaml logs --tail=10 nginx 2>/dev/null || echo "No SSL nginx logs available"
+if docker compose -f docker compose.ssl.yaml ps nginx 2>/dev/null | grep -q "Up"; then
+    docker compose -f docker compose.ssl.yaml logs --tail=10 nginx 2>/dev/null || echo "No SSL nginx logs available"
 elif docker compose ps nginx 2>/dev/null | grep -q "Up"; then
     docker compose logs --tail=10 nginx 2>/dev/null || echo "No basic nginx logs available"
 else
@@ -223,7 +223,7 @@ echo ""
 
 if [ -n "$DOMAIN" ]; then
     echo -e "${YELLOW}Certbot logs:${NC}"
-    docker compose -f docker-compose.ssl.yaml logs --tail=10 certbot 2>/dev/null || echo "No certbot logs available"
+    docker compose -f docker compose.ssl.yaml logs --tail=10 certbot 2>/dev/null || echo "No certbot logs available"
     echo ""
 fi
 
@@ -232,10 +232,10 @@ echo -e "${BLUE}10. Recommendations:${NC}"
 echo ""
 
 # Check if services are running
-if ! docker compose ps 2>/dev/null | grep -q "Up" && ! docker compose -f docker-compose.ssl.yaml ps 2>/dev/null | grep -q "Up"; then
+if ! docker compose ps 2>/dev/null | grep -q "Up" && ! docker compose -f docker compose.ssl.yaml ps 2>/dev/null | grep -q "Up"; then
     echo -e "${RED}• Start services:${NC}"
     echo "  Basic: docker compose up -d"
-    echo "  SSL:   docker compose -f docker-compose.ssl.yaml up -d"
+    echo "  SSL:   docker compose -f docker compose.ssl.yaml up -d"
 fi
 
 # DNS recommendations
@@ -251,20 +251,20 @@ if [ -n "$DOMAIN" ] && ! curl -I -m 10 http://$DOMAIN >/dev/null 2>&1; then
 fi
 
 # SSL recommendations
-if [ -n "$DOMAIN" ] && ! docker compose -f docker-compose.ssl.yaml run --rm certbot ls /etc/letsencrypt/live/$DOMAIN/ >/dev/null 2>&1; then
+if [ -n "$DOMAIN" ] && ! docker compose -f docker compose.ssl.yaml run --rm certbot ls /etc/letsencrypt/live/$DOMAIN/ >/dev/null 2>&1; then
     echo -e "${RED}• Generate SSL certificates:${NC}"
     echo "  ./scripts/setup-ssl.sh $DOMAIN your-email@domain.com"
 fi
 
 echo ""
 echo -e "${BLUE}Quick commands:${NC}"
-echo "  View all logs:     docker compose -f docker-compose.ssl.yaml logs -f"
-echo "  Restart services:  docker compose -f docker-compose.ssl.yaml restart"
-echo "  Stop services:     docker compose -f docker-compose.ssl.yaml down"
-echo "  Rebuild:           docker compose -f docker-compose.ssl.yaml up --build -d"
+echo "  View all logs:     docker compose -f docker compose.ssl.yaml logs -f"
+echo "  Restart services:  docker compose -f docker compose.ssl.yaml restart"
+echo "  Stop services:     docker compose -f docker compose.ssl.yaml down"
+echo "  Rebuild:           docker compose -f docker compose.ssl.yaml up --build -d"
 
 if [ -n "$DOMAIN" ]; then
-    echo "  Renew SSL:         docker compose -f docker-compose.ssl.yaml run --rm certbot renew --force-renewal"
+    echo "  Renew SSL:         docker compose -f docker compose.ssl.yaml run --rm certbot renew --force-renewal"
 fi
 
 echo ""

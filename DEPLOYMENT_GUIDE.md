@@ -39,17 +39,17 @@ sudo docker buildx prune -a -f 2>/dev/null || true
 # - Deploy all services
 
 # Check status
-sudo docker compose -f docker-compose-tools-ssl.yaml ps
+sudo docker compose -f docker compose-tools-ssl.yaml ps
 ```
 
 ### 4. Verify Deployment
 
 ```bash
 # Check all services are running
-sudo docker compose -f docker-compose-tools-ssl.yaml ps
+sudo docker compose -f docker compose-tools-ssl.yaml ps
 
 # Check logs if needed
-sudo docker compose -f docker-compose-tools-ssl.yaml logs
+sudo docker compose -f docker compose-tools-ssl.yaml logs
 
 # Test endpoints
 curl -I https://your-domain.com/
@@ -75,7 +75,7 @@ git clone --recursive https://github.com/apathy-ca/tools-portal.git
 cd tools-portal
 
 # Deploy without SSL
-sudo docker compose -f docker-compose-tools.yaml up -d
+sudo docker compose -f docker compose-tools.yaml up -d
 
 # Access at:
 # - Main Portal: http://localhost/
@@ -155,28 +155,28 @@ Internet
 ### View Logs
 ```bash
 # All services
-sudo docker compose -f docker-compose-tools-ssl.yaml logs
+sudo docker compose -f docker compose-tools-ssl.yaml logs
 
 # Specific service
-sudo docker compose -f docker-compose-tools-ssl.yaml logs tools-portal
-sudo docker compose -f docker-compose-tools-ssl.yaml logs dns-by-eye
-sudo docker compose -f docker-compose-tools-ssl.yaml logs nginx
+sudo docker compose -f docker compose-tools-ssl.yaml logs tools-portal
+sudo docker compose -f docker compose-tools-ssl.yaml logs dns-by-eye
+sudo docker compose -f docker compose-tools-ssl.yaml logs nginx
 
 # Check nginx and certbot status (common restart issues)
-sudo docker compose -f docker-compose-tools-ssl.yaml logs nginx
-sudo docker compose -f docker-compose-tools-ssl.yaml logs certbot
+sudo docker compose -f docker compose-tools-ssl.yaml logs nginx
+sudo docker compose -f docker compose-tools-ssl.yaml logs certbot
 
 # If nginx is restarting, check SSL certificate paths
-sudo docker compose -f docker-compose-tools-ssl.yaml exec nginx ls -la /etc/letsencrypt/live/
+sudo docker compose -f docker compose-tools-ssl.yaml exec nginx ls -la /etc/letsencrypt/live/
 ```
 
 ### Restart Services
 ```bash
 # All services
-sudo docker compose -f docker-compose-tools-ssl.yaml restart
+sudo docker compose -f docker compose-tools-ssl.yaml restart
 
 # Specific service
-sudo docker compose -f docker-compose-tools-ssl.yaml restart dns-by-eye
+sudo docker compose -f docker compose-tools-ssl.yaml restart dns-by-eye
 ```
 
 ### Update Deployment
@@ -186,16 +186,16 @@ git pull origin main
 git submodule update --remote
 
 # Rebuild and restart
-sudo docker compose -f docker-compose-tools-ssl.yaml up -d --build
+sudo docker compose -f docker compose-tools-ssl.yaml up -d --build
 ```
 
 ### SSL Certificate Management
 ```bash
 # Check certificate status
-sudo docker compose -f docker-compose-tools-ssl.yaml exec certbot certbot certificates
+sudo docker compose -f docker compose-tools-ssl.yaml exec certbot certbot certificates
 
 # Manual renewal (automatic renewal runs every 12 hours)
-sudo docker compose -f docker-compose-tools-ssl.yaml exec certbot certbot renew
+sudo docker compose -f docker compose-tools-ssl.yaml exec certbot certbot renew
 ```
 
 ### Backup Important Data
@@ -204,7 +204,7 @@ sudo docker compose -f docker-compose-tools-ssl.yaml exec certbot certbot renew
 sudo cp -r /var/lib/docker/volumes/tools-portal_certbot_conf/_data /backup/ssl-certs/
 
 # Configuration files
-cp docker-compose-tools-ssl.yaml nginx-tools-ssl.conf /backup/config/
+cp docker compose-tools-ssl.yaml nginx-tools-ssl.conf /backup/config/
 
 # Redis data (if needed)
 sudo cp -r /var/lib/docker/volumes/tools-portal_redis_data/_data /backup/redis/
@@ -217,7 +217,7 @@ sudo cp -r /var/lib/docker/volumes/tools-portal_redis_data/_data /backup/redis/
 1. **Services not starting**
    ```bash
    # Check logs
-   sudo docker compose -f docker-compose-tools-ssl.yaml logs
+   sudo docker compose -f docker compose-tools-ssl.yaml logs
    
    # Check if ports are available
    sudo netstat -tlnp | grep -E ':80|:443'
@@ -229,7 +229,7 @@ sudo cp -r /var/lib/docker/volumes/tools-portal_redis_data/_data /backup/redis/
    ./scripts/troubleshoot.sh your-domain.com
    
    # Check certificate status
-   sudo docker compose -f docker-compose-tools-ssl.yaml exec certbot certbot certificates
+   sudo docker compose -f docker compose-tools-ssl.yaml exec certbot certbot certificates
    ```
 
 3. **DNS By Eye not accessible**
@@ -244,10 +244,10 @@ sudo cp -r /var/lib/docker/volumes/tools-portal_redis_data/_data /backup/redis/
 4. **Redis connection issues**
    ```bash
    # Check Redis status
-   sudo docker compose -f docker-compose-tools-ssl.yaml exec redis redis-cli ping
+   sudo docker compose -f docker compose-tools-ssl.yaml exec redis redis-cli ping
    
    # Check Redis logs
-   sudo docker compose -f docker-compose-tools-ssl.yaml logs redis
+   sudo docker compose -f docker compose-tools-ssl.yaml logs redis
    ```
 
 ### Health Checks
@@ -316,7 +316,7 @@ To add additional tools to the platform:
    git submodule add https://github.com/your-org/your-tool.git tools/your-tool
    ```
 
-2. **Update docker-compose.yaml**:
+2. **Update docker compose.yaml**:
    ```yaml
    your-tool:
      build: ./tools/your-tool
@@ -340,7 +340,7 @@ To add additional tools to the platform:
 
 5. **Deploy**:
    ```bash
-   sudo docker compose -f docker-compose-tools-ssl.yaml up -d --build
+   sudo docker compose -f docker compose-tools-ssl.yaml up -d --build
    ```
 
 ## Support

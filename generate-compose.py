@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Dynamic Docker Compose Generator for Tools Portal
-Automatically detects available tool submodules and generates appropriate docker-compose configuration.
+Automatically detects available tool submodules and generates appropriate docker compose configuration.
 """
 
 import os
@@ -253,8 +253,8 @@ def generate_ssl_services():
     }
 
 def generate_compose_file(ssl=False, bind_ip=None):
-    """Generate complete docker-compose configuration."""
-    print(f"🔧 Generating docker-compose configuration (SSL: {ssl}, Bind IP: {bind_ip or 'all interfaces'})...")
+    """Generate complete docker compose configuration."""
+    print(f"🔧 Generating docker compose configuration (SSL: {ssl}, Bind IP: {bind_ip or 'all interfaces'})...")
     
     detected_tools = detect_tools()
     
@@ -319,7 +319,7 @@ def detect_ssl_domain():
     # Check for existing SSL certificates
     try:
         import subprocess
-        result = subprocess.run(['docker', 'compose', '-f', 'docker-compose-tools-ssl.yaml', 'run', '--rm', '--entrypoint=', 'certbot', 'ls', '/etc/letsencrypt/live/'], 
+        result = subprocess.run(['docker', 'compose', '-f', 'docker compose-tools-ssl.yaml', 'run', '--rm', '--entrypoint=', 'certbot', 'ls', '/etc/letsencrypt/live/'], 
                               capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             lines = result.stdout.strip().split('\n')
@@ -601,10 +601,10 @@ Examples:
     # Generate both configurations
     for ssl in [False, True]:
         suffix = '-ssl' if ssl else ''
-        compose_filename = f'docker-compose-tools{suffix}.yaml'
+        compose_filename = f'docker compose-tools{suffix}.yaml'
         nginx_filename = f'nginx-tools{suffix}.conf'
         
-        # Generate docker-compose file
+        # Generate docker compose file
         compose_config = generate_compose_file(ssl, args.bind_ip)
         with open(compose_filename, 'w') as f:
             yaml.dump(compose_config, f, default_flow_style=False, sort_keys=False)
@@ -628,15 +628,15 @@ Examples:
         print("   Access your tools at: http://localhost/ or http://YOUR_IP/")
     
     print("\n📋 Usage:")
-    print("   Standard:  docker-compose -f docker-compose-tools.yaml up --build")
-    print("   With SSL:  docker-compose -f docker-compose-tools-ssl.yaml up --build")
+    print("   Standard:  docker compose -f docker compose-tools.yaml up --build")
+    print("   With SSL:  docker compose -f docker compose-tools-ssl.yaml up --build")
     print("\n⚠️  Important:")
     print("   - Update nginx-tools-ssl.conf with your actual domain name")
     print("   - Ensure SSL certificates are properly configured")
     print("\n💡 To add/remove tools:")
     print("   1. Add/remove git submodules in tools/ directory")
     print("   2. Run this script to regenerate compose and nginx files")
-    print("   3. Restart with docker-compose")
+    print("   3. Restart with docker compose")
 
 if __name__ == '__main__':
     main()

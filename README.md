@@ -74,7 +74,7 @@ Tools are dynamically detected from the `tools/` directory and automatically int
 
 2. **Generate configuration files**:
    ```bash
-   # Generate docker-compose and nginx configuration files
+   # Generate docker compose and nginx configuration files
    python generate-compose.py
    ```
 
@@ -90,13 +90,13 @@ Tools are dynamically detected from the `tools/` directory and automatically int
    ./scripts/setup-ssl.sh your-domain.com admin@your-domain.com
    
    # Deploy all services
-   sudo docker compose -f docker-compose-tools-ssl.yaml up -d
+   sudo docker compose -f docker compose-tools-ssl.yaml up -d
    ```
 
 5. **Deploy without SSL (Development)**:
    ```bash
    # For local development/testing
-   sudo docker compose -f docker-compose-tools.yaml up -d
+   sudo docker compose -f docker compose-tools.yaml up -d
    ```
 
 6. **Access the portal**:
@@ -108,7 +108,7 @@ Tools are dynamically detected from the `tools/` directory and automatically int
 
 ### Core Files
 - `app.py` - Main Flask application for tools portal
-- `docker-compose-tools-ssl.yaml` - Production deployment with SSL
+- `docker compose-tools-ssl.yaml` - Production deployment with SSL
 - `nginx-tools-ssl.conf` - nginx configuration with SSL and routing
 - `gunicorn_config.py` - WSGI server configuration
 
@@ -127,12 +127,12 @@ Tools are automatically detected and integrated when added to the `tools/` direc
 ### Quick Process:
 1. **Add tool as submodule**: `git submodule add <repo-url> tools/your-tool`
 2. **Generate configuration**: `python generate-compose.py`
-3. **Deploy**: `docker-compose -f docker-compose-tools.yaml up --build`
+3. **Deploy**: `docker compose -f docker compose-tools.yaml up --build`
 
 The system automatically:
 - Detects tools with Dockerfiles in `tools/` directory
 - Loads tool configuration from `config.py` if present
-- Generates docker-compose and nginx configurations
+- Generates docker compose and nginx configurations
 - Integrates tools into the portal interface
 
 ## Security Features
@@ -152,10 +152,10 @@ The system automatically:
 ### Logs
 ```bash
 # View all services
-sudo docker compose -f docker-compose-tools-ssl.yaml logs
+sudo docker compose -f docker compose-tools-ssl.yaml logs
 
 # View specific service
-sudo docker compose -f docker-compose-tools-ssl.yaml logs tools-portal
+sudo docker compose -f docker compose-tools-ssl.yaml logs tools-portal
 ```
 
 ## Development
@@ -163,7 +163,7 @@ sudo docker compose -f docker-compose-tools-ssl.yaml logs tools-portal
 ### Local Development
 ```bash
 # Run without SSL for development
-sudo docker compose -f docker-compose-tools.yaml up -d
+sudo docker compose -f docker compose-tools.yaml up -d
 
 # Access at http://localhost/
 ```
@@ -215,7 +215,7 @@ Tools are automatically detected and integrated. See [`EXAMPLE_TOOL_INTEGRATION.
 
 3. **Deploy**:
    ```bash
-   docker-compose -f docker-compose-tools.yaml up --build
+   docker compose -f docker compose-tools.yaml up --build
    ```
 
 **Tool Requirements:**
@@ -223,14 +223,14 @@ Tools are automatically detected and integrated. See [`EXAMPLE_TOOL_INTEGRATION.
 - Should include `config.py` with `TOOL_INFO` for proper integration
 - Must provide `/api/health` endpoint on port 5000
 
-The system automatically generates docker-compose files, nginx routing, and portal integration.
+The system automatically generates docker compose files, nginx routing, and portal integration.
 
 ## Production Deployment
 
 ### SSL Certificate Management
 Certificates are automatically managed by Let's Encrypt. Manual renewal:
 ```bash
-sudo docker compose -f docker-compose-tools-ssl.yaml exec nginx certbot renew
+sudo docker compose -f docker compose-tools-ssl.yaml exec nginx certbot renew
 ```
 
 ### Backup
@@ -245,7 +245,7 @@ Important files to backup:
 git pull origin main
 
 # Rebuild and restart
-sudo docker compose -f docker-compose-tools-ssl.yaml up -d --build
+sudo docker compose -f docker compose-tools-ssl.yaml up -d --build
 ```
 
 ## API Documentation

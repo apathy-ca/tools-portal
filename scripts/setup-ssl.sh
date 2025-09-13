@@ -35,7 +35,7 @@ usage() {
     echo "Prerequisites:"
     echo "  - Domain must point to this server"
     echo "  - Ports 80 and 443 must be open"
-    echo "  - Docker and docker-compose must be installed"
+    echo "  - Docker and docker compose must be installed"
     echo "  - Git submodules initialized (git submodule update --init --recursive)"
 }
 
@@ -241,7 +241,7 @@ elif [ $CERT_RESULT -ne 0 ]; then
     echo "You can:"
     echo "1. Wait for rate limit to reset (up to 7 days)"
     echo "2. Use existing certificates if available"
-    echo "3. Deploy without SSL using docker-compose-tools.yaml"
+    echo "3. Deploy without SSL using docker compose -f docker-compose-tools.yaml"
     echo ""
     read -p "Continue with deployment anyway? (y/N): " -n 1 -r
     echo
