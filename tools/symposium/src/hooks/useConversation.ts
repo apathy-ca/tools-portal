@@ -4,8 +4,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Message, Sage, ConversationResponse, AvailableModels } from '@/types';
-import { apiClient, mockResponses } from '@/lib/api';
+import { Message, Sage, ConversationResponse, AvailableModels } from '../types';
+import { apiClient, mockResponses } from '../lib/api';
 
 interface ServiceStatus {
   memory: boolean;

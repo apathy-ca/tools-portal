@@ -28,11 +28,7 @@ const nextConfig = {
       },
     ];
   },
-  // Ensure proper hostname binding in Docker
-  server: {
-    host: '0.0.0.0',
-    port: 5000,
-  },
+  // Note: server config moved to package.json scripts
 }
 
 module.exports = nextConfig

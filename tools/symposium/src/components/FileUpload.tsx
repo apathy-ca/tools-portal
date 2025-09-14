@@ -5,8 +5,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { Upload, File, X, AlertCircle, CheckCircle } from 'lucide-react';
-import { apiClient } from '@/lib/api';
-import { FileUploadResponse } from '@/types';
+import { apiClient } from '../lib/api';
+import { FileUploadResponse } from '../types';
 
 interface FileUploadProps {
   onUploadComplete?: (result: FileUploadResponse) => void;
