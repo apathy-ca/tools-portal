@@ -1,0 +1,169 @@
+services:
+  tools-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tools-portal
+    restart: unless-stopped
+    environment:
+    - FLASK_ENV=production
+    volumes:
+    - ./static:/app/static
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  redis:
+    image: redis:7-alpine
+    container_name: tools-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+    - redis_data:/data
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  dns-by-eye:
+    build:
+      context: ./tools/dns-by-eye
+      dockerfile: Dockerfile
+    container_name: dns-by-eye
+    restart: unless-stopped
+    environment:
+    - FLASK_ENV=production
+    - STATIC_URL_PATH=/dns-by-eye/static
+    volumes:
+    - ./tools/dns-by-eye/app/static/generated:/app/app/static/generated
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  ipwhale:
+    build:
+      context: ./tools/ipwhale
+      dockerfile: Dockerfile
+    container_name: ipwhale
+    restart: unless-stopped
+    environment:
+    - FLASK_ENV=production
+    - STATIC_URL_PATH=/ipwhale/static
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  symposium:
+    build:
+      context: ./tools/symposium
+      dockerfile: Dockerfile
+    container_name: symposium
+    restart: unless-stopped
+    environment:
+    - NODE_ENV=production
+    - NEXT_PUBLIC_API_URL=/api
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
+      interval: 30s
+      timeout: 15s
+      retries: 5
+  nginx:
+    image: nginx:alpine
+    container_name: tools-nginx
+    restart: unless-stopped
+    ports:
+    - 80:80
+    - 443:443
+    volumes:
+    - ./nginx-tools-ssl.conf:/etc/nginx/nginx.conf:ro
+    - ./ssl:/etc/nginx/ssl:ro
+    - certbot_conf:/etc/letsencrypt
+    - certbot_www:/var/www/certbot
+    depends_on:
+    - tools-portal
+    - dns-by-eye
+    - ipwhale
+    - symposium
+    networks:
+    - tools-network
+    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done
+      & nginx -g 'daemon off;'"
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  cleanup:
+    image: alpine:latest
+    container_name: tools-cleanup
+    restart: unless-stopped
+    volumes:
+    - ./tools/dns-by-eye/app/static/generated:/cleanup/dns-by-eye
+    command: "sh -c '\n        while true; do\n          echo \"Cleaning up generated\
+      \ files older than 7 days...\"\n          find /cleanup/dns-by-eye -name \"\
+      *.png\" -type f -mtime +7 -delete 2>/dev/null || true; find /cleanup/dns-by-eye\
+      \ -name \"*.svg\" -type f -mtime +7 -delete 2>/dev/null || true\n          echo\
+      \ \"Cleanup completed. Sleeping for 24 hours...\"\n          sleep 86400\n \
+      \       done\n      ' "
+    networks:
+    - tools-network
+  certbot:
+    image: certbot/certbot
+    container_name: tools-certbot
+    restart: unless-stopped
+    volumes:
+    - certbot_conf:/etc/letsencrypt
+    - certbot_www:/var/www/certbot
+    networks:
+    - tools-network
+    entrypoint: '"/bin/sh"'
+    command: "\n              -c \"\n                while true; do\n            \
+      \      echo 'Certbot renewal check...'\n                  certbot renew --quiet\
+      \ --no-self-upgrade\n                  echo 'Next renewal check in 12 hours...'\n\
+      \                  sleep 43200\n                done\n              \"\n   \
+      \         "
+volumes:
+  redis_data: null
+  certbot_conf: null
+  certbot_www: null
+networks:
+  tools-network:
+    driver: bridge

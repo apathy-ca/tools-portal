@@ -85,6 +85,28 @@ def get_tool_config(tool_name):
         },
     }
     
+    # Special handling for symposium (Next.js app)
+    if tool_name == 'symposium':
+        return {
+            'build': {
+                'context': f'./tools/{tool_name}',
+                'dockerfile': 'Dockerfile'
+            },
+            'container_name': tool_name,
+            'restart': 'unless-stopped',
+            'environment': [
+                'NODE_ENV=production',
+                'NEXT_PUBLIC_API_URL=/api'
+            ],
+            'networks': ['tools-network'],
+            'healthcheck': {
+                'test': ['CMD', 'curl', '-f', 'http://localhost:5000/api/health'],
+                'interval': '30s',
+                'timeout': '15s',
+                'retries': 5
+            }
+        }
+    
     return configs.get(tool_name, {
         'build': {
             'context': f'./tools/{tool_name}',

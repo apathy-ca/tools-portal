@@ -56,6 +56,24 @@ services:
       timeout: 10s
       retries: 3
 
+  # Symposium tool
+  symposium:
+    build:
+      context: ./tools/symposium
+      dockerfile: Dockerfile
+    container_name: symposium
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=/api
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+
   # Nginx reverse proxy
   nginx:
     image: nginx:alpine
@@ -69,6 +87,7 @@ services:
       - tools-portal
       - dns-by-eye
       - ipwhale
+      - symposium
     networks:
       - tools-network
     healthcheck:
