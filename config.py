@@ -51,3 +51,16 @@ class Config:
     # CORS configuration (optional - disabled by default)
     CORS_ENABLED = os.environ.get('CORS_ENABLED', 'false').lower() == 'true'
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+    
+    # Redis Configuration
+    REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
+    REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
+    REDIS_DB = int(os.environ.get('REDIS_DB', '1'))  # Use database 1 for tools-portal
+    REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD')
+    
+    @property
+    def REDIS_URL(self):
+        """Get Redis URL"""
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
