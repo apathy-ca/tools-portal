@@ -168,13 +168,12 @@ def generate_nginx_service(detected_tools, ssl=False, bind_ip=None):
     depends_on = ['tools-portal'] + detected_tools
     
     # Format port bindings based on whether bind_ip is specified
-    # Use port 8080 for tools-portal to avoid conflicts with other services on port 80
     if bind_ip:
-        http_port = f'{bind_ip}:8080:80'
-        https_port = f'{bind_ip}:8443:443'
+        http_port = f'{bind_ip}:80:80'
+        https_port = f'{bind_ip}:443:443'
     else:
-        http_port = '8080:80'
-        https_port = '8443:443'
+        http_port = '80:80'
+        https_port = '443:443'
     
     if ssl:
         return {
@@ -645,17 +644,17 @@ Examples:
     
     if args.bind_ip:
         print(f"\n🔗 Services configured to bind to: {args.bind_ip}")
-        print(f"   Access your tools at: http://{args.bind_ip}:8080/")
+        print(f"   Access your tools at: http://{args.bind_ip}/")
     else:
         print("\n🔗 Services configured to bind to all interfaces")
-        print("   Access your tools at: http://localhost:8080/ or http://YOUR_IP:8080/")
+        print("   Access your tools at: http://localhost/ or http://YOUR_IP/")
     
     print("\n📋 Usage:")
     print("   Standard:  docker compose -f docker-compose-tools.yaml up --build")
     print("   With SSL:  docker compose -f docker-compose-tools-ssl.yaml up --build")
-    print("\n🔌 Port Configuration:")
-    print("   - Tools Portal runs on port 8080 (HTTP) and 8443 (HTTPS)")
-    print("   - This avoids conflicts with other services using port 80/443")
+    print("\n💡 To avoid port conflicts:")
+    print("   Use --bind-ip to bind to a specific IP (e.g., --bind-ip 192.168.14.100)")
+    print("   This prevents conflicts with other services on the same ports")
     print("\n⚠️  Important:")
     print("   - Update nginx-tools-ssl.conf with your actual domain name")
     print("   - Ensure SSL certificates are properly configured")
