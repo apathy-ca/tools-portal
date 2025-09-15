@@ -1,5 +1,4 @@
 services:
-  # Main tools portal
   tools-portal:
     build:
       context: .
@@ -7,18 +6,37 @@ services:
     container_name: tools-portal
     restart: unless-stopped
     environment:
-      - FLASK_ENV=production
+    - FLASK_ENV=production
     volumes:
-      - ./static:/app/static
+    - ./static:/app/static
     networks:
-      - tools-network
+    - tools-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/health
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # DNS By Eye tool
+  redis:
+    image: redis:7-alpine
+    container_name: tools-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+    - redis_data:/data
+    networks:
+    - tools-network
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
   dns-by-eye:
     build:
       context: ./tools/dns-by-eye
@@ -26,19 +44,21 @@ services:
     container_name: dns-by-eye
     restart: unless-stopped
     environment:
-      - FLASK_ENV=production
-      - STATIC_URL_PATH=/dns-by-eye/static
+    - FLASK_ENV=production
+    - STATIC_URL_PATH=/dns-by-eye/static
     volumes:
-      - ./tools/dns-by-eye/app/static/generated:/app/app/static/generated
+    - ./tools/dns-by-eye/app/static/generated:/app/app/static/generated
     networks:
-      - tools-network
+    - tools-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # IP Whale tool
   ipwhale:
     build:
       context: ./tools/ipwhale
@@ -46,16 +66,19 @@ services:
     container_name: ipwhale
     restart: unless-stopped
     environment:
-      - FLASK_ENV=production
+    - FLASK_ENV=production
+    - STATIC_URL_PATH=/ipwhale/static
     networks:
-      - tools-network
+    - tools-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Symposium tool
   symposium:
     build:
       context: ./tools/symposium
@@ -63,111 +86,84 @@ services:
     container_name: symposium
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=/api
+    - NODE_ENV=production
+    - NEXT_PUBLIC_API_URL=/api
     networks:
-      - tools-network
+    - tools-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
       interval: 30s
       timeout: 15s
       retries: 5
-
-  # Nginx reverse proxy with SSL
   nginx:
     image: nginx:alpine
     container_name: tools-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+    - 80:80
+    - 443:443
     volumes:
-      - ./nginx-tools-ssl.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
+    - ./nginx-tools-ssl.conf:/etc/nginx/nginx.conf:ro
+    - ./ssl:/etc/nginx/ssl:ro
+    - certbot_conf:/etc/letsencrypt
+    - certbot_www:/var/www/certbot
     depends_on:
-      - tools-portal
-      - dns-by-eye
-      - ipwhale
-      - symposium
+    - tools-portal
+    - dns-by-eye
+    - ipwhale
+    - symposium
     networks:
-      - tools-network
-    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+    - tools-network
+    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done
+      & nginx -g 'daemon off;'"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost/health
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Certbot for SSL certificates
-  certbot:
-    image: certbot/certbot
-    container_name: tools-certbot
-    restart: unless-stopped
-    volumes:
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    networks:
-      - tools-network
-    entrypoint: "/bin/sh"
-    command: >
-      -c "
-        while true; do
-          echo 'Certbot renewal check...'
-          certbot renew --quiet --no-self-upgrade
-          echo 'Next renewal check in 12 hours...'
-          sleep 43200
-        done
-      "
-
-  # Redis for caching (shared across tools)
-  redis:
-    image: redis:7-alpine
-    container_name: tools-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    networks:
-      - tools-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Cleanup service for generated files
   cleanup:
     image: alpine:latest
     container_name: tools-cleanup
     restart: unless-stopped
     volumes:
-      - ./tools/dns-by-eye/app/static/generated:/cleanup/dns-by-eye
-    command: >
-      sh -c '
-        while true; do
-          echo "Cleaning up generated files older than 7 days..."
-          find /cleanup -name "*.png" -type f -mtime +7 -delete 2>/dev/null || true
-          find /cleanup -name "*.svg" -type f -mtime +7 -delete 2>/dev/null || true
-          echo "Cleaning up if more than 1000 files exist..."
-          file_count=$$(find /cleanup -name "*.png" -type f | wc -l)
-          if [ $$file_count -gt 1000 ]; then
-            echo "Too many files ($$file_count), cleaning oldest..."
-            find /cleanup -name "*.png" -type f -exec ls -t {} + | tail -n +501 | xargs rm -f 2>/dev/null || true
-          fi
-          echo "Cleanup completed. Sleeping for 24 hours..."
-          sleep 86400
-        done
-      '
+    - ./tools/dns-by-eye/app/static/generated:/cleanup/dns-by-eye
+    command: "sh -c '\n        while true; do\n          echo \"Cleaning up generated\
+      \ files older than 7 days...\"\n          find /cleanup/dns-by-eye -name \"\
+      *.png\" -type f -mtime +7 -delete 2>/dev/null || true; find /cleanup/dns-by-eye\
+      \ -name \"*.svg\" -type f -mtime +7 -delete 2>/dev/null || true\n          echo\
+      \ \"Cleanup completed. Sleeping for 24 hours...\"\n          sleep 86400\n \
+      \       done\n      ' "
     networks:
-      - tools-network
-
+    - tools-network
+  certbot:
+    image: certbot/certbot
+    container_name: tools-certbot
+    restart: unless-stopped
+    volumes:
+    - certbot_conf:/etc/letsencrypt
+    - certbot_www:/var/www/certbot
+    networks:
+    - tools-network
+    entrypoint: '"/bin/sh"'
+    command: "\n              -c \"\n                while true; do\n            \
+      \      echo 'Certbot renewal check...'\n                  certbot renew --quiet\
+      \ --no-self-upgrade\n                  echo 'Next renewal check in 12 hours...'\n\
+      \                  sleep 43200\n                done\n              \"\n   \
+      \         "
 volumes:
-  redis_data:
-  certbot_conf:
-  certbot_www:
-
+  redis_data: null
+  certbot_conf: null
+  certbot_www: null
 networks:
   tools-network:
     driver: bridge

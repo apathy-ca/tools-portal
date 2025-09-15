@@ -341,7 +341,7 @@ def detect_ssl_domain():
     # Check for existing SSL certificates
     try:
         import subprocess
-        result = subprocess.run(['docker', 'compose', '-f', 'docker compose-tools-ssl.yaml', 'run', '--rm', '--entrypoint=', 'certbot', 'ls', '/etc/letsencrypt/live/'], 
+        result = subprocess.run(['docker', 'compose', '-f', 'docker-compose-tools-ssl.yaml', 'run', '--rm', '--entrypoint=', 'certbot', 'ls', '/etc/letsencrypt/live/'],
                               capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             lines = result.stdout.strip().split('\n')
@@ -623,7 +623,7 @@ Examples:
     # Generate both configurations
     for ssl in [False, True]:
         suffix = '-ssl' if ssl else ''
-        compose_filename = f'docker compose-tools{suffix}.yaml'
+        compose_filename = f'docker-compose-tools{suffix}.yaml'
         nginx_filename = f'nginx-tools{suffix}.conf'
         
         # Generate docker compose file
@@ -650,8 +650,8 @@ Examples:
         print("   Access your tools at: http://localhost/ or http://YOUR_IP/")
     
     print("\n📋 Usage:")
-    print("   Standard:  docker compose -f docker compose-tools.yaml up --build")
-    print("   With SSL:  docker compose -f docker compose-tools-ssl.yaml up --build")
+    print("   Standard:  docker compose -f docker-compose-tools.yaml up --build")
+    print("   With SSL:  docker compose -f docker-compose-tools-ssl.yaml up --build")
     print("\n⚠️  Important:")
     print("   - Update nginx-tools-ssl.conf with your actual domain name")
     print("   - Ensure SSL certificates are properly configured")
