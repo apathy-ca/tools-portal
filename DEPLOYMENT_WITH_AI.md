@@ -45,10 +45,10 @@ cp config.py config_original.py
 cp requirements.txt requirements_original.txt
 
 # Use enhanced versions
-cp app_enhanced.py app.py
-cp templates/index_enhanced.html templates/index.html
-cp config_enhanced.py config.py
-cp requirements_enhanced.txt requirements.txt
+cp enhanced/app_enhanced.py app.py
+cp enhanced/index_enhanced.html templates/index.html
+cp enhanced/config_enhanced.py config.py
+cp enhanced/requirements_enhanced.txt requirements.txt
 ```
 
 ### 3. Install Dependencies

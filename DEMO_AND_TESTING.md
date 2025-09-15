@@ -16,12 +16,12 @@ cd tools-portal
 cp .env.ai.example .env
 
 # Install enhanced dependencies
-pip install -r requirements_enhanced.txt
+pip install -r enhanced/requirements_enhanced.txt
 
 # Use enhanced components
-cp app_enhanced.py app.py
-cp templates/index_enhanced.html templates/index.html
-cp config_enhanced.py config.py
+cp enhanced/app_enhanced.py app.py
+cp enhanced/index_enhanced.html templates/index.html
+cp enhanced/config_enhanced.py config.py
 ```
 
 ### 2. Start Demo Mode
