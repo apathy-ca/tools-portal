@@ -6,7 +6,3 @@
 	path = tools/ipwhale
 	url = https://github.com/apathy-ca/ipwhale.git
 	branch = main
-[submodule "tools/symposium"]
-	path = tools/symposium
-	url = ../thesymposium
-	branch = main

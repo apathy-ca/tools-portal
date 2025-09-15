@@ -1,6 +1,6 @@
 {
-  "detected_at": "C:\\Users\\T947564\\Source\\repos\\tools\\tools-portal",
-  "tool_count": 2,
+  "detected_at": "/home/jhenry/Source/Symposium/tools-portal",
+  "tool_count": 3,
   "tools": {
     "dns-by-eye": {
       "name": "DNS By Eye",
@@ -47,6 +47,30 @@
         "asn",
         "ptr",
         "nat-detection"
+      ]
+    },
+    "symposium": {
+      "name": "Symposium",
+      "description": "AI consciousness exploration platform with multiple AI Sages for intelligent conversations",
+      "version": "1.0.0",
+      "url": "/symposium/",
+      "icon": "\ud83e\udde0",
+      "category": "AI & Consciousness",
+      "status": "stable",
+      "features": [
+        "Multiple AI Sage personalities",
+        "Intelligent conversation management",
+        "File upload and analysis",
+        "Model selection and preferences",
+        "Persistent conversation history",
+        "Consciousness exploration"
+      ],
+      "tags": [
+        "ai",
+        "consciousness",
+        "chat",
+        "sage",
+        "llm"
       ]
     }
   }

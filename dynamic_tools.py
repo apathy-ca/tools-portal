@@ -157,6 +157,10 @@ def get_tool_categories(tools: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str,
         'Gaming & Entertainment': {
             'icon': '🎮',
             'description': 'Gaming tools, character generators, and entertainment utilities'
+        },
+        'AI & Consciousness': {
+            'icon': '🧠',
+            'description': 'AI consciousness exploration, chat interfaces, and machine learning tools'
         }
     }
     
