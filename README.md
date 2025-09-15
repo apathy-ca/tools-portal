@@ -76,6 +76,9 @@ Tools are dynamically detected from the `tools/` directory and automatically int
    ```bash
    # Generate docker compose and nginx configuration files
    python generate-compose.py
+   
+   # Optional: Configure specific bind IP (see BIND_IP_CONFIGURATION.md)
+   python generate-compose.py --bind-ip 192.168.1.100
    ```
 
 3. **Configure your domain (SSL only)**:
@@ -111,6 +114,10 @@ Tools are dynamically detected from the `tools/` directory and automatically int
 - `docker compose-tools-ssl.yaml` - Production deployment with SSL
 - `nginx-tools-ssl.conf` - nginx configuration with SSL and routing
 - `gunicorn_config.py` - WSGI server configuration
+- `.tools-config` - Persistent configuration for bind IP and other settings
+
+### Configuration Guides
+- [`BIND_IP_CONFIGURATION.md`](BIND_IP_CONFIGURATION.md) - Configure IP binding to avoid port conflicts
 
 ### Templates
 - `templates/index.html` - Main landing page

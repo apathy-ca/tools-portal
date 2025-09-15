@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Dynamic Docker Compose Generator for Tools Portal
 Automatically detects available tool submodules and generates appropriate docker compose configuration.
@@ -10,12 +11,35 @@ import yaml
 import json
 import argparse
 from pathlib import Path
+import re
 
 # Fix encoding issues on Windows
 if sys.platform.startswith('win'):
     import codecs
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+def read_config_file():
+    """Read configuration from .tools-config file."""
+    config_file = Path('.tools-config')
+    config = {}
+    
+    if config_file.exists():
+        try:
+            with open(config_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip comments and empty lines
+                    if line.startswith('#') or not line:
+                        continue
+                    # Parse KEY=VALUE format
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        config[key.strip()] = value.strip()
+        except Exception as e:
+            print(f"⚠️  Warning: Could not read .tools-config file: {e}")
+    
+    return config
 
 def detect_tools():
     """Detect available tools based on submodule presence."""
@@ -606,17 +630,30 @@ Examples:
         print("❌ Error: Please run this script from the tools-portal directory")
         sys.exit(1)
     
+    # Read config file
+    config = read_config_file()
+    
+    # Use bind_ip from command line, or fall back to config file
+    bind_ip = args.bind_ip
+    if not bind_ip and 'BIND_IP' in config:
+        bind_ip = config['BIND_IP']
+        print(f"📁 Using bind IP from config file: {bind_ip}")
+    
     # Validate IP address if provided
-    if args.bind_ip:
+    if bind_ip:
         import ipaddress
         try:
-            ipaddress.ip_address(args.bind_ip)
-            print(f"🔗 Binding services to IP: {args.bind_ip}")
+            ipaddress.ip_address(bind_ip)
+            if args.bind_ip:
+                print(f"🔗 Binding services to IP (from command line): {bind_ip}")
+            else:
+                print(f"🔗 Binding services to IP (from config): {bind_ip}")
         except ValueError:
-            print(f"❌ Error: Invalid IP address '{args.bind_ip}'")
+            print(f"❌ Error: Invalid IP address '{bind_ip}'")
             sys.exit(1)
     else:
         print("🔗 Binding services to all interfaces (0.0.0.0)")
+        print("💡 Tip: Set BIND_IP in .tools-config or use --bind-ip to bind to a specific IP")
     
     detected_tools = detect_tools()
     
@@ -627,7 +664,7 @@ Examples:
         nginx_filename = f'nginx-tools{suffix}.conf'
         
         # Generate docker compose file
-        compose_config = generate_compose_file(ssl, args.bind_ip)
+        compose_config = generate_compose_file(ssl, bind_ip)
         with open(compose_filename, 'w') as f:
             yaml.dump(compose_config, f, default_flow_style=False, sort_keys=False)
         print(f"✅ Generated {compose_filename}")
@@ -642,9 +679,9 @@ Examples:
     
     print("\n🎉 Docker Compose and Nginx files generated successfully!")
     
-    if args.bind_ip:
-        print(f"\n🔗 Services configured to bind to: {args.bind_ip}")
-        print(f"   Access your tools at: http://{args.bind_ip}/")
+    if bind_ip:
+        print(f"\n🔗 Services configured to bind to: {bind_ip}")
+        print(f"   Access your tools at: http://{bind_ip}/")
     else:
         print("\n🔗 Services configured to bind to all interfaces")
         print("   Access your tools at: http://localhost/ or http://YOUR_IP/")

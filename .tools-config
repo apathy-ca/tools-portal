@@ -1,0 +1,19 @@
+# Tools Portal Configuration
+# This file preserves settings between generate-compose.py runs
+
+# Bind IP setting - uncomment and set your preferred IP
+# To stop the script from defaulting to 192.168.14.24, set your desired IP here:
+# BIND_IP=192.168.1.100
+
+# Example configurations:
+# BIND_IP=10.0.0.50      # For virtual IP
+# BIND_IP=192.168.1.100  # For specific network interface
+# BIND_IP=127.0.0.1      # For localhost only
+# BIND_IP=0.0.0.0        # For all interfaces (explicit)
+# Leave commented for all interfaces (default behavior)
+
+# NOTE: If you were getting 192.168.14.24 automatically, it was likely from:
+# - A previous command line argument being cached somewhere
+# - An environment variable being set
+# - Running the script from a different location
+# This config file now ensures your preference is preserved.
