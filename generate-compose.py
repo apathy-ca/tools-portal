@@ -120,11 +120,12 @@ def get_tool_config(tool_name):
             'restart': 'unless-stopped',
             'environment': [
                 'NODE_ENV=production',
-                'NEXT_PUBLIC_API_URL=/api'
+                'NEXT_PUBLIC_API_URL=http://192.168.14.4:8000',
+                'NEXT_PUBLIC_BACKEND_URL=http://192.168.14.4:8000'
             ],
             'networks': ['tools-network'],
             'healthcheck': {
-                'test': ['CMD', 'curl', '-f', 'http://localhost:5000/api/health'],
+                'test': ['CMD', 'curl', '-f', 'http://localhost:3000/api/health'],
                 'interval': '30s',
                 'timeout': '15s',
                 'retries': 5
