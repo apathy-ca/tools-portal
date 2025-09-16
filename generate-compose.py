@@ -161,7 +161,12 @@ def generate_base_services():
             },
             'container_name': 'tools-portal',
             'restart': 'unless-stopped',
-            'environment': ['FLASK_ENV=production'],
+            'environment': [
+                'FLASK_ENV=production',
+                'REDIS_HOST=redis',
+                'REDIS_PORT=6379',
+                'REDIS_DB=1'
+            ],
             'volumes': ['./static:/app/static'],
             'networks': ['tools-network'],
             'healthcheck': {
@@ -176,6 +181,7 @@ def generate_base_services():
             'container_name': 'tools-redis',
             'restart': 'unless-stopped',
             'command': 'redis-server --appendonly yes',
+            'ports': ['${REDIS_EXTERNAL_PORT:-6379}:6379'],
             'volumes': ['redis_data:/data'],
             'networks': ['tools-network'],
             'healthcheck': {
