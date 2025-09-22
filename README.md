@@ -1,10 +1,10 @@
 # Tools Portal
 
-A professional web-based platform for hosting network administration tools with SSL support and microservices architecture.
+A web-based platform for hosting tools with SSL support and microservices architecture.
 
 ## Overview
 
-Tools Portal provides a clean, scalable platform for deploying and managing multiple network administration tools. Built with Flask, Docker, and nginx, it offers a production-ready environment with SSL certificates, security headers, and rate limiting.
+Tools Portal provides a clean, scalable platform for deploying and managing multiple tools. Built with Flask, Docker, and nginx, it offers a production-ready environment with SSL certificates, security headers, and rate limiting.
 
 ## Features
 
@@ -293,4 +293,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Tools Portal** - Professional network administration tools platform
+**Tools Portal** - General-purpose tools platform

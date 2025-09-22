@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tools Portal - Network Administration Tools{% if ai_features_available %} with AI Assistant{% endif %}</title>
+    <title>Tools Portal{% if ai_features_available %} with AI Assistant{% endif %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     {% if ai_features_available %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai-chat.css') }}">
@@ -240,7 +240,7 @@
     <div class="container">
         <header class="header">
             <h1>🛠️ Tools Portal</h1>
-            <p>Professional network administration tools{% if ai_features_available %} with AI assistance{% endif %}</p>
+            <p>General-purpose tools platform{% if ai_features_available %} with AI assistance{% endif %}</p>
             {% if ai_features_available %}
             <div class="ai-badge" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.2); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; margin-top: 10px; backdrop-filter: blur(10px); animation: pulse 2s infinite;">
                 🤖 AI Assistant Available
@@ -296,7 +296,7 @@
         
         <footer class="footer">
             <p>
-                <strong>Tools Portal{% if ai_features_available %} with AI Integration{% endif %}</strong> - Professional network administration tools<br>
+                <strong>Tools Portal{% if ai_features_available %} with AI Integration{% endif %}</strong> - General-purpose tools platform<br>
                 Built with ❤️ using Flask{% if ai_features_available %} + Symposium AI Platform{% endif %} |
                 <a href="https://github.com/apathy-ca/tools-portal" target="_blank">📂 GitHub Repository</a> |
                 <a href="/api/health/detailed" target="_blank">🔌 API Health</a>
