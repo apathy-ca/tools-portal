@@ -1,25 +1,32 @@
 # Tools Portal Dockerfile
-FROM python:3.11-slim
+FROM python:3.11.9-slim
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies with security updates
 RUN apt-get update && apt-get install -y \
     graphviz \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY app.py .
-COPY config.py .
-COPY gunicorn_config.py .
-COPY templates/ templates/
-COPY static/ static/
+# Copy application files with proper ownership
+COPY --chown=appuser:appuser app.py config.py gunicorn_config.py ./
+COPY --chown=appuser:appuser templates/ templates/
+COPY --chown=appuser:appuser static/ static/
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 5000
