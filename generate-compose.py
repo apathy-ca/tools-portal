@@ -120,8 +120,8 @@ def get_tool_config(tool_name):
             'restart': 'unless-stopped',
             'environment': [
                 'NODE_ENV=production',
-                'NEXT_PUBLIC_API_URL=http://192.168.14.4:8000',
-                'NEXT_PUBLIC_BACKEND_URL=http://192.168.14.4:8000'
+                'NEXT_PUBLIC_API_URL=${SYMPOSIUM_API_URL:-http://localhost:8000}',
+                'NEXT_PUBLIC_BACKEND_URL=${SYMPOSIUM_BACKEND_URL:-http://localhost:8000}'
             ],
             'networks': ['tools-network'],
             'healthcheck': {
@@ -154,6 +154,11 @@ def get_tool_config(tool_name):
 
 def generate_base_services():
     """Generate base services that are always present."""
+    # Check if Redis should be exposed externally
+    redis_ports = []
+    if os.environ.get('REDIS_EXPOSE_PORT', 'true').lower() == 'true':
+        redis_ports = ['${REDIS_EXTERNAL_PORT:-6379}:6379']
+    
     return {
         'tools-portal': {
             'build': {
@@ -182,7 +187,7 @@ def generate_base_services():
             'container_name': 'tools-redis',
             'restart': 'unless-stopped',
             'command': 'redis-server --appendonly yes',
-            'ports': ['${REDIS_EXTERNAL_PORT:-6379}:6379'],
+            'ports': redis_ports,
             'volumes': ['redis_data:/data'],
             'networks': ['tools-network'],
             'healthcheck': {
@@ -539,12 +544,9 @@ http {{
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Forwarded-Port $server_port;
             
-            # TCP session information (available to all tools)
+            # TCP session information (sanitized for security)
             proxy_set_header X-Client-IP $remote_addr;
-            proxy_set_header X-Client-Port $remote_port;
-            proxy_set_header X-Server-IP $server_addr;
-            proxy_set_header X-Server-Port $server_port;
-            proxy_set_header X-Connection-ID $connection;
+            # Removed X-Client-Port, X-Server-IP, X-Server-Port, X-Connection-ID for security
             
             # Additional connection details (available to all tools)
             proxy_set_header X-Request-ID $request_id;
