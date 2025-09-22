@@ -144,7 +144,9 @@ dmypy.json
 Thumbs.db
 ehthumbs.db
 
-# Instance-specific nginx configurations
+# Generated configuration files (should be created by generate-compose.py)
+docker-compose-tools.yaml
+docker-compose-tools-ssl.yaml
 nginx-tools-ssl.conf
 nginx-tools.conf
 *.conf.bak
