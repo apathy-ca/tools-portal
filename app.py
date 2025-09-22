@@ -101,7 +101,7 @@ TOOLS = {
     'dns-by-eye': {
         'name': 'DNS By Eye',
         'description': 'DNS delegation visualizer with health scoring and glue record analysis',
-        'version': '1.3.0',
+        'version': '1.3.1',
         'url': '/dns-by-eye/',
         'icon': '🔍',
         'category': 'DNS & Networking',
@@ -119,7 +119,7 @@ TOOLS = {
     'ipwhale': {
         'name': 'IP Whale',
         'description': 'IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection',
-        'version': '1.0.0',
+        'version': '1.0.1',
         'url': '/ipwhale/',
         'icon': '🐋',
         'category': 'DNS & Networking',

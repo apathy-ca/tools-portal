@@ -23,7 +23,7 @@ class Config:
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     
     # Version info
-    VERSION = '2.0.0-ai'
+    VERSION = '2.0.1-ai'
     
     # Optional AI Integration Configuration
     # These settings are only used if Symposium backend is available
