@@ -1,8 +1,20 @@
 import os
+import warnings
 
 class Config:
     # Security settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
+    # WARNING: If SECRET_KEY is not set via environment variable, a random key will be generated
+    # This means sessions will be invalidated on every application restart
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        SECRET_KEY = os.urandom(32).hex()
+        warnings.warn(
+            "SECRET_KEY environment variable not set. Using generated key. "
+            "Sessions will be invalidated on application restart. "
+            "Set SECRET_KEY in production for persistent sessions.",
+            UserWarning
+        )
+
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'

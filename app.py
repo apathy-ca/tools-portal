@@ -11,6 +11,7 @@ import requests
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from config import Config
+from dynamic_tools import detect_available_tools, get_tool_categories
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
@@ -29,65 +30,11 @@ if not app.debug:
     app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
     app.logger.info('Tools Portal startup')
 
-# Tool registry - add new tools here
-TOOLS = {
-    'dns-by-eye': {
-        'name': 'DNS By Eye',
-        'description': 'DNS delegation visualizer with health scoring and glue record analysis',
-        'version': '1.3.1',
-        'url': '/dns-by-eye/',
-        'icon': '🔍',
-        'category': 'DNS & Networking',
-        'status': 'stable',
-        'features': [
-            'DNS delegation tracing',
-            'Visual graph generation',
-            'Health score calculation',
-            'Glue record validation',
-            'Multi-domain comparison',
-            'Export capabilities'
-        ],
-        'tags': ['dns', 'networking', 'visualization', 'debugging']
-    },
-    'ipwhale': {
-        'name': 'IP Whale',
-        'description': 'IP address information tool with IPv4/IPv6 detection, PTR records, ASN lookup, and NAT detection',
-        'version': '1.0.1',
-        'url': '/ipwhale/',
-        'icon': '🐋',
-        'category': 'DNS & Networking',
-        'status': 'stable',
-        'features': [
-            'IPv4 and IPv6 detection',
-            'PTR record lookup',
-            'ASN information',
-            'NAT detection',
-            'Remote port detection',
-            'Curl-friendly API endpoints'
-        ],
-        'tags': ['ip', 'networking', 'asn', 'ptr', 'nat-detection']
-    }
-    # Future tools will be added here
-}
-
-CATEGORIES = {
-    'DNS & Networking': {
-        'icon': '🌐',
-        'description': 'Tools for DNS analysis, network diagnostics, and connectivity testing'
-    },
-    'Security': {
-        'icon': '🔒',
-        'description': 'Security analysis, vulnerability scanning, and penetration testing tools'
-    },
-    'System Administration': {
-        'icon': '⚙️',
-        'description': 'Server management, monitoring, and system diagnostic utilities'
-    },
-    'Development': {
-        'icon': '💻',
-        'description': 'Developer tools, code analysis, and debugging utilities'
-    }
-}
+# Dynamically detect available tools
+app.logger.info('Detecting available tools...')
+TOOLS = detect_available_tools()
+CATEGORIES = get_tool_categories(TOOLS)
+app.logger.info(f'Detected {len(TOOLS)} tools in {len(CATEGORIES)} categories')
 
 @app.route('/')
 def index():
@@ -173,27 +120,6 @@ def detailed_health():
         health_status['status'] = 'degraded'
 
     return jsonify(health_status)
-
-@app.route('/dns-by-eye/')
-def dns_by_eye_redirect():
-    """Redirect to DNS By Eye tool - this will be handled by nginx proxy."""
-    return redirect('/')
-
-@app.route('/dns-by-eye/<path:path>')
-def dns_by_eye_subpaths(path):
-    """Handle DNS By Eye subpaths - this will be handled by nginx proxy."""
-    return redirect('/')
-
-@app.route('/ipwhale/')
-def ipwhale_redirect():
-    """Redirect to IP Whale tool - this will be handled by nginx proxy."""
-    return redirect('/')
-
-@app.route('/ipwhale/<path:path>')
-def ipwhale_subpaths(path):
-    """Handle IP Whale subpaths - this will be handled by nginx proxy."""
-    return redirect('/')
-
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
