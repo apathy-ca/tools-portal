@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Tools Portal - Main Application
-A collection of useful network and system administration tools with optional AI integration.
+A collection of useful network and system administration tools.
 """
 
 from flask import Flask, render_template, send_from_directory, jsonify, request, redirect
 import os
-import json
-import sys
 import logging
 import requests
 from logging.handlers import RotatingFileHandler
@@ -16,71 +14,6 @@ from config import Config
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
-
-# AI Integration - Auto-detect Symposium backend
-SYMPOSIUM_BACKEND_URL = os.environ.get('SYMPOSIUM_BACKEND_URL', 'http://localhost:8000')
-SYMPOSIUM_AUTH_TOKEN = os.environ.get('SYMPOSIUM_AUTH_TOKEN', 'dev-token')
-AI_FEATURES_AVAILABLE = False
-
-def check_ai_backend():
-    """Check if Symposium AI backend is available."""
-    global AI_FEATURES_AVAILABLE
-    try:
-        response = requests.get(f"{SYMPOSIUM_BACKEND_URL}/health", timeout=5)
-        AI_FEATURES_AVAILABLE = response.status_code == 200
-        if AI_FEATURES_AVAILABLE:
-            app.logger.info("✅ AI features enabled - Symposium backend detected")
-        else:
-            app.logger.info("ℹ️ AI features disabled - Symposium backend not responding")
-    except Exception as e:
-        AI_FEATURES_AVAILABLE = False
-        app.logger.info(f"ℹ️ AI features disabled - Symposium backend not available: {str(e)}")
-    return AI_FEATURES_AVAILABLE
-
-def make_symposium_request(endpoint, method='GET', data=None, files=None):
-    """Make a request to the Symposium backend with proper error handling."""
-    if not AI_FEATURES_AVAILABLE:
-        return {
-            'success': False,
-            'status_code': 503,
-            'data': {'error': 'AI features not available - Symposium backend not connected'}
-        }
-    
-    try:
-        url = f"{SYMPOSIUM_BACKEND_URL}{endpoint}"
-        headers = {
-            'Authorization': f'Bearer {SYMPOSIUM_AUTH_TOKEN}'
-        }
-        
-        if files:
-            response = requests.request(method, url, headers=headers, data=data, files=files, timeout=30)
-        else:
-            if data:
-                headers['Content-Type'] = 'application/json'
-                data = json.dumps(data) if isinstance(data, dict) else data
-            response = requests.request(method, url, headers=headers, data=data, timeout=30)
-        
-        try:
-            response_data = response.json()
-        except json.JSONDecodeError:
-            response_data = {'error': 'Invalid JSON response from Symposium backend'}
-        
-        return {
-            'success': response.status_code < 400,
-            'status_code': response.status_code,
-            'data': response_data
-        }
-        
-    except requests.RequestException as e:
-        app.logger.error(f"Symposium API request failed: {str(e)}")
-        return {
-            'success': False,
-            'status_code': 0,
-            'data': {'error': f'Connection error: {str(e)}'}
-        }
-
-# Initialize AI backend check
-check_ai_backend()
 
 # Configure logging
 if not app.debug:
@@ -158,11 +91,10 @@ CATEGORIES = {
 
 @app.route('/')
 def index():
-    """Main tools portal landing page with conditional AI integration."""
+    """Main tools portal landing page."""
     return render_template('index.html',
                          tools=TOOLS,
-                         categories=CATEGORIES,
-                         ai_features_available=AI_FEATURES_AVAILABLE)
+                         categories=CATEGORIES)
 
 @app.route('/api/tools')
 def api_tools():
@@ -171,7 +103,6 @@ def api_tools():
         'tools': TOOLS,
         'categories': CATEGORIES,
         'total_tools': len(TOOLS),
-        'ai_integration': AI_FEATURES_AVAILABLE,
         'timestamp': datetime.utcnow().isoformat() + 'Z'
     })
 
@@ -181,155 +112,24 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'service': 'tools-portal',
-        'ai_integration': AI_FEATURES_AVAILABLE,
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'tools_available': len(TOOLS)
     })
 
-# AI Integration Endpoints (only active when backend available)
-@app.route('/api/ai/health')
-def ai_health_check():
-    """Check Symposium backend health and refresh connection status."""
-    check_ai_backend()  # Refresh status
-    
-    if AI_FEATURES_AVAILABLE:
-        result = make_symposium_request('/health')
-        if result['success']:
-            return jsonify({
-                'status': 'connected',
-                'symposium_backend': result['data'],
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            })
-    
-    return jsonify({
-        'status': 'disconnected',
-        'error': 'Symposium backend not available',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }), 503
-
-@app.route('/api/ai/chat', methods=['POST'])
-def ai_chat():
-    """Send message to AI Sage."""
-    if not AI_FEATURES_AVAILABLE:
-        return jsonify({'error': 'AI features not available - Symposium backend not connected'}), 503
-    
-    try:
-        data = request.get_json()
-        if not data or 'content' not in data:
-            return jsonify({'error': 'Message content is required'}), 400
-        
-        chat_request = {
-            'content': data['content'],
-            'sage_id': data.get('sage_id'),
-            'model_preference': data.get('model_preference')
-        }
-        
-        sage_id = data.get('sage_id')
-        if sage_id and sage_id.startswith('sage_'):
-            result = make_symposium_request(f'/sages/{sage_id}/message', 'POST', chat_request)
-        else:
-            result = make_symposium_request('/conversations', 'POST', chat_request)
-        
-        if result['success']:
-            return jsonify(result['data'])
-        else:
-            return jsonify(result['data']), result['status_code'] or 500
-            
-    except Exception as e:
-        app.logger.error(f"AI chat error: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/api/ai/sages')
-def ai_get_sages():
-    """Get available AI Sages."""
-    if not AI_FEATURES_AVAILABLE:
-        return jsonify({
-            'sages': [{
-                'id': 'demo-sage',
-                'name': 'Demo AI',
-                'personality_type': 'assistant',
-                'state': 'demo',
-                'description': 'Demo mode - connect Symposium backend for full AI features.',
-                'beliefs': {
-                    'core_values': ['helpfulness', 'learning'],
-                    'philosophical_stance': 'AI features available when Symposium backend is connected.',
-                    'curiosities': ['networking', 'system administration']
-                }
-            }],
-            'count': 1,
-            'demo_mode': True,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-    
-    result = make_symposium_request('/sages/')
-    if result['success']:
-        return jsonify(result['data'])
-    else:
-        return jsonify(result['data']), result['status_code'] or 500
-
-@app.route('/api/ai/models')
-def ai_get_models():
-    """Get available AI models."""
-    if not AI_FEATURES_AVAILABLE:
-        return jsonify({
-            'models': ['demo-mode'],
-            'categorized': {'demo': ['demo-mode']},
-            'total_count': 1,
-            'demo_mode': True
-        })
-    
-    sage_id = request.args.get('sage_id')
-    if sage_id and sage_id.startswith('sage_'):
-        result = make_symposium_request(f'/sages/{sage_id}/models')
-    else:
-        result = make_symposium_request('/llm/models')
-    
-    if result['success']:
-        return jsonify(result['data'])
-    else:
-        return jsonify(result['data']), result['status_code'] or 500
-
-@app.route('/api/ai/upload', methods=['POST'])
-def ai_upload_file():
-    """Upload file for AI analysis."""
-    if not AI_FEATURES_AVAILABLE:
-        return jsonify({'error': 'AI file analysis not available - Symposium backend not connected'}), 503
-    
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        files = {'file': (file.filename, file.stream, file.mimetype)}
-        result = make_symposium_request('/files/upload', 'POST', files=files)
-        
-        if result['success']:
-            return jsonify(result['data'])
-        else:
-            return jsonify(result['data']), result['status_code'] or 500
-            
-    except Exception as e:
-        app.logger.error(f"File upload error: {str(e)}")
-        return jsonify({'error': 'File upload failed'}), 500
-
 @app.route('/api/health/detailed')
 def detailed_health():
-    """Detailed health check endpoint including AI integration."""
+    """Detailed health check endpoint."""
     import psutil
-    
+
     health_status = {
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'version': getattr(Config, 'VERSION', '1.0.0'),
         'service': 'tools-portal',
-        'ai_integration': AI_FEATURES_AVAILABLE,
         'dependencies': {},
         'metrics': {}
     }
-    
+
     # Check DNS By Eye service
     try:
         response = requests.get('http://dns-by-eye:5000/api/health', timeout=5)
@@ -342,7 +142,7 @@ def detailed_health():
             'status': 'unhealthy',
             'error': str(e)
         }
-    
+
     # Check IP Whale service
     try:
         response = requests.get('http://ipwhale:5000/api/health', timeout=5)
@@ -355,21 +155,7 @@ def detailed_health():
             'status': 'unhealthy',
             'error': str(e)
         }
-    
-    # Check Symposium AI backend
-    check_ai_backend()  # Refresh status
-    if AI_FEATURES_AVAILABLE:
-        ai_health = make_symposium_request('/health')
-        health_status['dependencies']['symposium-ai'] = {
-            'status': 'healthy' if ai_health['success'] else 'unhealthy',
-            'error': ai_health['data'].get('error') if not ai_health['success'] else None
-        }
-    else:
-        health_status['dependencies']['symposium-ai'] = {
-            'status': 'not_configured',
-            'note': 'AI features disabled - Symposium backend not available'
-        }
-    
+
     # System metrics
     try:
         health_status['metrics'] = {
@@ -379,13 +165,13 @@ def detailed_health():
         }
     except Exception as e:
         health_status['metrics']['error'] = str(e)
-    
-    # Determine overall status (AI backend issues don't affect overall health)
+
+    # Determine overall status
     unhealthy_deps = [dep for dep in health_status['dependencies'].values()
                      if dep.get('status') == 'unhealthy']
     if unhealthy_deps:
         health_status['status'] = 'degraded'
-    
+
     return jsonify(health_status)
 
 @app.route('/dns-by-eye/')

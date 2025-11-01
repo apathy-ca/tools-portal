@@ -23,27 +23,8 @@ class Config:
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     
     # Version info
-    VERSION = '2.0.1-ai'
-    
-    # Optional AI Integration Configuration
-    # These settings are only used if Symposium backend is available
-    SYMPOSIUM_BACKEND_URL = os.environ.get('SYMPOSIUM_BACKEND_URL', 'http://localhost:8000')
-    SYMPOSIUM_AUTH_TOKEN = os.environ.get('SYMPOSIUM_AUTH_TOKEN', 'dev-token')
-    SYMPOSIUM_REQUEST_TIMEOUT = int(os.environ.get('SYMPOSIUM_REQUEST_TIMEOUT', '30'))
-    
-    # AI Chat Configuration (optional - defaults work fine)
-    AI_CHAT_MAX_MESSAGE_LENGTH = int(os.environ.get('AI_CHAT_MAX_MESSAGE_LENGTH', '2000'))
-    AI_CHAT_MAX_FILE_SIZE = int(os.environ.get('AI_CHAT_MAX_FILE_SIZE', '10485760'))  # 10MB
-    AI_CHAT_ALLOWED_FILE_TYPES = os.environ.get(
-        'AI_CHAT_ALLOWED_FILE_TYPES',
-        '.txt,.pdf,.docx,.md,.json,.csv,.py,.js,.html,.css,.log'
-    ).split(',')
-    
-    # Feature toggles (optional)
-    ENABLE_FILE_UPLOAD = os.environ.get('ENABLE_FILE_UPLOAD', 'true').lower() == 'true'
-    ENABLE_SAGE_SELECTION = os.environ.get('ENABLE_SAGE_SELECTION', 'true').lower() == 'true'
-    ENABLE_MODEL_SELECTION = os.environ.get('ENABLE_MODEL_SELECTION', 'true').lower() == 'true'
-    
+    VERSION = '2.1.0'
+
     # Rate limiting (optional - disabled by default)
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'false').lower() == 'true'
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '100 per hour')

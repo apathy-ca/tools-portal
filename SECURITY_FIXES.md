@@ -17,12 +17,7 @@
    - **After**: Redis port exposure commented out, only accessible within docker network
    - **Files**: `docker-compose-tools.yaml`, `docker-compose-tools-ssl.yaml`
 
-2. **Hardcoded Internal IP Addresses**
-   - **Before**: Symposium service used hardcoded IP `192.168.14.4:8000`
-   - **After**: Uses environment variables with secure defaults
-   - **Files**: `docker-compose-tools.yaml`, `docker-compose-tools-ssl.yaml`
-
-3. **Internal Network Headers Exposure**
+2. **Internal Network Headers Exposure**
    - **Before**: Nginx exposed internal docker network details via headers:
      - `X-Server-IP $server_addr` (docker bridge IP)
      - `X-Server-Port $server_port`
