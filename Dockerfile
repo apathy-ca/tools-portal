@@ -22,6 +22,8 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy application files with proper ownership
 COPY --chown=appuser:appuser app.py config.py gunicorn_config.py dynamic_tools.py ./
+COPY --chown=appuser:appuser routes/ routes/
+COPY --chown=appuser:appuser services/ services/
 COPY --chown=appuser:appuser templates/ templates/
 COPY --chown=appuser:appuser static/ static/
 
