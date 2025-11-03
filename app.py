@@ -10,11 +10,18 @@ import logging
 import requests
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from flask_caching import Cache
 from config import Config
 from dynamic_tools import detect_available_tools, get_tool_categories
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.from_object(Config)
+
+# Initialize caching
+cache = Cache(app, config={
+    'CACHE_TYPE': 'simple',  # In-memory cache
+    'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes default
+})
 
 # Configure logging
 if not app.debug:
@@ -44,6 +51,7 @@ def index():
                          categories=CATEGORIES)
 
 @app.route('/api/tools')
+@cache.cached(timeout=300)  # Cache for 5 minutes
 def api_tools():
     """API endpoint to get list of available tools."""
     return jsonify({
@@ -64,8 +72,9 @@ def health_check():
     })
 
 @app.route('/api/health/detailed')
+@cache.cached(timeout=60)  # Cache for 1 minute
 def detailed_health():
-    """Detailed health check endpoint."""
+    """Detailed health check endpoint with dynamic tool discovery."""
     import psutil
 
     health_status = {
@@ -77,31 +86,22 @@ def detailed_health():
         'metrics': {}
     }
 
-    # Check DNS By Eye service
-    try:
-        response = requests.get('http://dns-by-eye:5000/api/health', timeout=5)
-        health_status['dependencies']['dns-by-eye'] = {
-            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
-            'response_time': response.elapsed.total_seconds()
-        }
-    except Exception as e:
-        health_status['dependencies']['dns-by-eye'] = {
-            'status': 'unhealthy',
-            'error': str(e)
-        }
-
-    # Check IP Whale service
-    try:
-        response = requests.get('http://ipwhale:5000/api/health', timeout=5)
-        health_status['dependencies']['ipwhale'] = {
-            'status': 'healthy' if response.status_code == 200 else 'unhealthy',
-            'response_time': response.elapsed.total_seconds()
-        }
-    except Exception as e:
-        health_status['dependencies']['ipwhale'] = {
-            'status': 'unhealthy',
-            'error': str(e)
-        }
+    # Dynamically check all detected tools
+    for tool_name in TOOLS.keys():
+        try:
+            response = requests.get(f'http://{tool_name}:5000/api/health', timeout=5)
+            health_status['dependencies'][tool_name] = {
+                'status': 'healthy' if response.status_code == 200 else 'unhealthy',
+                'response_time': response.elapsed.total_seconds(),
+                'status_code': response.status_code
+            }
+        except Exception as e:
+            app.logger.exception(f"Health check failed for {tool_name}")
+            health_status['dependencies'][tool_name] = {
+                'status': 'unhealthy',
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
 
     # System metrics
     try:
@@ -111,7 +111,11 @@ def detailed_health():
             'disk_percent': psutil.disk_usage('/').percent
         }
     except Exception as e:
-        health_status['metrics']['error'] = str(e)
+        app.logger.exception("Failed to collect system metrics")
+        health_status['metrics']['error'] = {
+            'message': str(e),
+            'type': type(e).__name__
+        }
 
     # Determine overall status
     unhealthy_deps = [dep for dep in health_status['dependencies'].values()
