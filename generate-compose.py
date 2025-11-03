@@ -150,7 +150,10 @@ def generate_base_services():
                 'REDIS_PORT=6379',
                 'REDIS_DB=1'
             ],
-            'volumes': ['./static:/app/static'],
+            'volumes': [
+                './static:/app/static',
+                './tools:/app/tools:ro'  # Mount tools directory as read-only for dynamic discovery
+            ],
             'networks': ['tools-network'],
             'healthcheck': {
                 'test': ['CMD', 'curl', '-f', 'http://localhost:5000/health'],
