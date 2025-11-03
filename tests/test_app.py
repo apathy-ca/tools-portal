@@ -4,7 +4,8 @@ Basic unit tests for Tools Portal
 
 import unittest
 import json
-from app import app, cache, TOOLS
+from app import app
+from services.tools import tool_service
 
 
 class ToolsPortalTestCase(unittest.TestCase):
@@ -15,11 +16,11 @@ class ToolsPortalTestCase(unittest.TestCase):
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
-        cache.clear()
+        app.cache.clear()
 
     def tearDown(self):
         """Clean up after each test."""
-        cache.clear()
+        app.cache.clear()
 
     def test_health_endpoint(self):
         """Test basic health check endpoint."""
@@ -42,7 +43,7 @@ class ToolsPortalTestCase(unittest.TestCase):
         self.assertIn('categories', data)
         self.assertIn('total_tools', data)
         self.assertIn('timestamp', data)
-        self.assertEqual(data['total_tools'], len(TOOLS))
+        self.assertEqual(data['total_tools'], tool_service.get_tool_count())
 
     def test_tools_api_caching(self):
         """Test that tools API endpoint is cached."""
@@ -110,12 +111,12 @@ class DynamicToolDiscoveryTestCase(unittest.TestCase):
 
     def test_tools_detected(self):
         """Test that tools are detected on startup."""
-        self.assertIsInstance(TOOLS, dict)
-        self.assertGreater(len(TOOLS), 0, "At least one tool should be detected")
+        self.assertIsInstance(tool_service.tools, dict)
+        self.assertGreater(len(tool_service.tools), 0, "At least one tool should be detected")
 
     def test_tool_structure(self):
         """Test that detected tools have required fields."""
-        for tool_name, tool_config in TOOLS.items():
+        for tool_name, tool_config in tool_service.tools.items():
             self.assertIn('name', tool_config)
             self.assertIn('description', tool_config)
             self.assertIn('version', tool_config)
