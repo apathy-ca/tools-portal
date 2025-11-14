@@ -1,29 +1,28 @@
-# Tools Portal Dockerfile
-FROM python:3.11.9-slim
-
-# Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Tools Portal v2 - Dockerfile
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies with security updates
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    graphviz \
     curl \
-    && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
 
-# Copy application files with proper ownership
-COPY --chown=appuser:appuser app.py config.py gunicorn_config.py ./
-COPY --chown=appuser:appuser templates/ templates/
-COPY --chown=appuser:appuser static/ static/
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY app/ ./app/
+COPY run.py .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
@@ -35,5 +34,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Run the application with gunicorn
-CMD ["gunicorn", "--config=gunicorn_config.py", "app:app"]
+# Run application with gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "run:app"]

@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Tools Portal - Main application
+  tools-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tools-portal-v2
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-changeme-in-production}
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - CACHE_TYPE=simple
+    volumes:
+      # Mount tools directory for access to submodule code
+      - ./tools:/app/tools:ro
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Caddy - Automatic HTTPS with Let's Encrypt
+  caddy:
+    image: caddy:2-alpine
+    container_name: tools-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - tools-portal
+    networks:
+      - tools-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL (optional - for future features)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: tools-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=tools_portal
+  #     - POSTGRES_USER=tools
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - tools-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U tools"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # Redis (optional - for caching and rate limiting)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: tools-redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - tools-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+networks:
+  tools-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  # postgres_data:
+  #   driver: local
+  # redis_data:
+  #   driver: local
